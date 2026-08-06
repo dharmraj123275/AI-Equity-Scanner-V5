@@ -1,0 +1,32 @@
+[
+  {
+    "symbol": "RELIANCE",
+    "name": "Reliance Industries",
+    "exchange": "NSE"
+  },
+  {
+    "symbol": "TCS",
+    "name": "Tata Consultancy Services",
+    "exchange": "NSE"
+  },
+  {
+    "symbol": "HDFCBANK",
+    "name": "HDFC Bank",
+    "exchange": "NSE"
+  },
+  {
+    "symbol": "SBIN",
+    "name": "State Bank of India",
+    "exchange": "NSE"
+  },
+  {
+    "symbol": "BANKNIFTY",
+    "name": "Nifty Bank",
+    "exchange": "INDEX"
+  },
+  {
+    "symbol": "NIFTY50",
+    "name": "Nifty 50",
+    "exchange": "INDEX"
+  }
+]
