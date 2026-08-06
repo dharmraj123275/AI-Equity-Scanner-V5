@@ -1,1 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+<title>AI Equity Scanner Pro V5</title>
+
+<link rel="stylesheet" href="style.css">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+<div class="container">
+
+<header>
+
+<h1>📈 AI Equity Scanner Pro</h1>
+
+<p>NSE • SME • BSE • Nifty • Bank Nifty</p>
+
+</header>
+
+<div class="status-card">
+
+<h2>📊 Market Status</h2>
+
+<p id="marketStatus">Loading...</p>
+
+<p id="lastUpdate">Waiting for server...</p>
+
+</div>
+
+<div class="search-box">
+
+<input
+type="text"
+id="search"
+placeholder="Search Stock">
+
+<button onclick="scanStock()">
+
+🚀 Scan Market
+
+</button>
+
+</div>
+
+<div id="result"></div>
+
+<div id="topStocks"></div>
+
+<script src="app.js"></script>
+
+</body>
+
+</html>
