@@ -1,3 +1,6 @@
+const path = require("path");
+
+app.use(express.static(path.join(__dirname, "public")));
 require("dotenv").config();
 
 const express = require("express");
@@ -82,4 +85,7 @@ app.get("/api/market", (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`AI Equity Scanner running on port ${PORT}`);
+});
+app.get("/", (req, res) => {
+    res.sendFile(path.join(__dirname, "public", "index.html"));
 });
