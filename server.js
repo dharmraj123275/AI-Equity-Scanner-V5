@@ -39,3 +39,47 @@ app.get("/api/status", (req, res) => {
     bankNifty: "🟢 Live"
   });
 });
+// Demo market data (આને પછી Upstox Live API થી બદલશું)
+app.get("/api/market", (req, res) => {
+
+    res.json([
+        {
+            symbol: "RELIANCE",
+            price: 3125.40,
+            score: 92,
+            signal: "STRONG BUY",
+            rsi: 67,
+            volume: "2.8M",
+            entry: 3115,
+            target: 3185,
+            sl: 3085
+        },
+        {
+            symbol: "SBIN",
+            price: 924.50,
+            score: 88,
+            signal: "BUY",
+            rsi: 61,
+            volume: "5.1M",
+            entry: 920,
+            target: 940,
+            sl: 910
+        },
+        {
+            symbol: "INFY",
+            price: 1512.75,
+            score: 42,
+            signal: "SELL",
+            rsi: 38,
+            volume: "1.6M",
+            entry: 1510,
+            target: 1480,
+            sl: 1535
+        }
+    ]);
+
+});
+
+app.listen(PORT, () => {
+    console.log(`AI Equity Scanner running on port ${PORT}`);
+});
