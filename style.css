@@ -73,7 +73,105 @@ font-size:18px;
 outline:none;
 margin-bottom:15px;
 }
+.summary{
+display:grid;
+grid-template-columns:repeat(3,1fr);
+gap:12px;
+margin-top:15px;
+}
 
+.box{
+background:#0f172a;
+border:1px solid rgba(255,255,255,.08);
+border-radius:14px;
+padding:18px;
+text-align:center;
+}
+
+.box h3{
+font-size:32px;
+color:#00e676;
+margin-bottom:8px;
+}
+
+.box p{
+font-size:16px;
+color:#bfc7d5;
+}
+
+.footer{
+margin-top:25px;
+text-align:center;
+color:#94a3b8;
+font-size:15px;
+padding:15px;
+}
+
+#buyList,
+#sellList,
+#searchResult{
+display:flex;
+flex-direction:column;
+gap:12px;
+}
+
+.stock-card:hover{
+transform:translateY(-3px);
+transition:0.25s;
+box-shadow:0 10px 25px rgba(0,0,0,.35);
+}
+
+.green{
+color:#00e676;
+}
+
+.red{
+color:#ff5252;
+}
+
+.orange{
+color:#ffb300;
+}
+
+@media (max-width:600px){
+
+.header h1{
+font-size:30px;
+}
+
+.header h2{
+font-size:20px;
+}
+
+.card h2{
+font-size:22px;
+}
+
+.status{
+font-size:16px;
+}
+
+.stock-card h3{
+font-size:22px;
+}
+
+.stock-card p{
+font-size:15px;
+}
+
+button{
+font-size:18px;
+}
+
+.summary{
+grid-template-columns:1fr;
+}
+
+.box h3{
+font-size:26px;
+}
+
+}
 button{
 width:100%;
 padding:14px;
