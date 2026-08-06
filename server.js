@@ -96,6 +96,17 @@ app.get("/api/live", async (req, res) => {
 
 });
 
+app.get("/login", (req, res) => {
+
+    const url =
+        "https://api.upstox.com/v2/login/authorization/dialog" +
+        "?response_type=code" +
+        "&client_id=" + process.env.UPSTOX_API_KEY +
+        "&redirect_uri=" + encodeURIComponent(process.env.UPSTOX_REDIRECT_URI);
+
+    res.redirect(url);
+
+});
 app.listen(PORT, () => {
     console.log("Server running on port " + PORT);
 });
