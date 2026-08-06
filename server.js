@@ -2,8 +2,8 @@ require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
-const axios = require("axios");
 const path = require("path");
+const { getQuote } = require("./services/upstox");
 
 const app = express();
 
@@ -22,27 +22,25 @@ app.get("/", (req, res) => {
 app.get("/api/health", (req, res) => {
     res.json({
         status: "OK",
-        app: "AI Equity Scanner V6"
+        app: "AI Equity Scanner V5"
     });
 });
 
 // Market Status
 app.get("/api/status", (req, res) => {
     res.json({
-        market: "LIVE",
-        nifty: "🟢 LIVE",
-        bankNifty: "🟢 LIVE"
+        nifty: "LIVE",
+        bankNifty: "LIVE"
     });
 });
 
-// Demo Market Data
+// Demo Market
 app.get("/api/market", (req, res) => {
-
     res.json([
         {
             symbol: "RELIANCE",
             price: 3125.40,
-            signal: "STRONG BUY",
+            signal: "BUY",
             aiScore: 92
         },
         {
@@ -58,10 +56,9 @@ app.get("/api/market", (req, res) => {
             aiScore: 42
         }
     ]);
-
 });
 
-// Demo Scan
+// Scan API
 app.get("/api/scan", (req, res) => {
 
     const stock = (req.query.stock || "RELIANCE").toUpperCase();
@@ -69,33 +66,24 @@ app.get("/api/scan", (req, res) => {
     res.json({
         name: stock,
         signal: "BUY",
-        aiScore: 91,
-        price: 1234.56
+        aiScore: 90,
+        price: 1000
     });
 
 });
 
-// Live Upstox Quote
+// Live Quote API
 app.get("/api/live", async (req, res) => {
 
     try {
 
-        const instrument = req.query.instrument;
+        const instrument =
+            req.query.instrument ||
+            "NSE_EQ|INE002A01018";
 
-        const response = await axios.get(
-            "https://api.upstox.com/v2/market-quote/quotes",
-            {
-                headers: {
-                    Accept: "application/json",
-                    Authorization: `Bearer ${process.env.UPSTOX_ACCESS_TOKEN}`
-                },
-                params: {
-                    instrument_key: instrument
-                }
-            }
-        );
+        const data = await getQuote(instrument);
 
-        res.json(response.data);
+        res.json(data);
 
     } catch (err) {
 
@@ -109,7 +97,5 @@ app.get("/api/live", async (req, res) => {
 });
 
 app.listen(PORT, () => {
-
-    console.log("AI Equity Scanner V6 Running on Port " + PORT);
-
+    console.log("Server running on port " + PORT);
 });
