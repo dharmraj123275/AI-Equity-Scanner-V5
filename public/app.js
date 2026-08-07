@@ -3,7 +3,7 @@ async function scanStock() {
     const input = document.getElementById("search");
     const result = document.getElementById("result");
 
-    const stock = input.value.trim();
+    const stock = input.value.trim().toUpperCase();
 
     if (!stock) {
         result.innerHTML = `
@@ -15,7 +15,7 @@ async function scanStock() {
 
     result.innerHTML = `
         <h2>🔄 Loading...</h2>
-        <p>Fetching live market data...</p>
+        <p>Fetching live Upstox data...</p>
     `;
 
     try {
@@ -24,48 +24,57 @@ async function scanStock() {
             "/api/live?symbol=" + encodeURIComponent(stock)
         );
 
-        const data = await response.json();
+        const responseData = await response.json();
 
-        console.log("LIVE API:", data);
+        console.log("UPSTOX RESPONSE:", responseData);
 
-        if (!data.success || !data.data) {
+        if (!responseData.success) {
             result.innerHTML = `
-                <h2>⚠️ Data unavailable</h2>
-                <p>${data.message || "Stock not found"}</p>
+                <h2>⚠️ API Error</h2>
+                <p>${responseData.message || "Unable to fetch data"}</p>
             `;
             return;
         }
 
-        // Upstox response contains instrument inside data object
-        const keys = Object.keys(data.data);
+        /*
+         * Actual API structure:
+         *
+         * responseData
+         *   └── data
+         *       └── data
+         *           └── NSE_EQ|RELIANCE
+         */
 
-        if (keys.length === 0) {
-            throw new Error("No market data found");
+        const marketData = responseData.data?.data;
+
+        if (!marketData) {
+            throw new Error("Market data not found");
         }
 
-        const market = data.data[keys[0]];
+        const keys = Object.keys(marketData);
+
+        if (keys.length === 0) {
+            throw new Error("No stock data found");
+        }
+
+        const market = marketData[keys[0]];
+
+        const price = market.last_price ?? "-";
+        const volume = market.volume ?? "-";
+        const oi = market.oi ?? "-";
+        const change = market.net_change ?? 0;
 
         const symbol =
             market.symbol ||
-            stock.toUpperCase();
-
-        const price =
-            market.last_price ?? "-";
-
-        const volume =
-            market.volume ?? "-";
-
-        const oi =
-            market.oi ?? "-";
-
-        const change =
-            market.net_change ?? 0;
+            stock;
 
         let signal = "HOLD";
 
         if (Number(change) > 0) {
             signal = "BUY";
-        } else if (Number(change) < 0) {
+        }
+
+        if (Number(change) < 0) {
             signal = "SELL";
         }
 
@@ -94,35 +103,38 @@ async function scanStock() {
 
                 <hr>
 
-                <h2>Signal: ${signal}</h2>
+                <h2>
+                    Signal: ${signal}
+                </h2>
 
                 <p>
                     🟢 Live Upstox Market Data
                 </p>
 
             </div>
+
         `;
 
     } catch (error) {
 
-        console.error("Scanner Error:", error);
+        console.error("SCAN ERROR:", error);
 
         result.innerHTML = `
             <h2>❌ Unable to load market data</h2>
-            <p>Please try again.</p>
+            <p>${error.message}</p>
         `;
     }
 }
 
 
-// Search on Enter
+// Press Enter to scan
 document.addEventListener("DOMContentLoaded", () => {
 
     const input = document.getElementById("search");
 
     if (input) {
 
-        input.addEventListener("keydown", function(event) {
+        input.addEventListener("keydown", (event) => {
 
             if (event.key === "Enter") {
                 scanStock();
