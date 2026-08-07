@@ -3,110 +3,146 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
-const { getQuote } = require("./services/upstox");
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// Frontend
 app.use(express.static(path.join(__dirname, "public")));
 
 const PORT = process.env.PORT || 3000;
 
-// Home
+// ===============================
+// HOME
+// ===============================
+
 app.get("/", (req, res) => {
-    res.sendFile(path.join(__dirname, "public", "index.html"));
+    res.sendFile(
+        path.join(__dirname, "public", "index.html")
+    );
 });
 
-// Health
+// ===============================
+// HEALTH CHECK
+// ===============================
+
 app.get("/api/health", (req, res) => {
+
     res.json({
         status: "OK",
-        app: "AI Equity Scanner V5"
+        app: "AI Equity Scanner",
+        version: "5.0"
     });
+
 });
 
-// Market Status
+// ===============================
+// MARKET STATUS
+// ===============================
+
 app.get("/api/status", (req, res) => {
-    res.json({
-        nifty: "LIVE",
-        bankNifty: "LIVE"
-    });
-});
-
-// Demo Market
-app.get("/api/market", (req, res) => {
-    res.json([
-        {
-            symbol: "RELIANCE",
-            price: 3125.40,
-            signal: "BUY",
-            aiScore: 92
-        },
-        {
-            symbol: "SBIN",
-            price: 924.50,
-            signal: "BUY",
-            aiScore: 88
-        },
-        {
-            symbol: "INFY",
-            price: 1512.75,
-            signal: "SELL",
-            aiScore: 42
-        }
-    ]);
-});
-
-// Scan API
-app.get("/api/scan", (req, res) => {
-
-    const stock = (req.query.stock || "RELIANCE").toUpperCase();
 
     res.json({
-        name: stock,
-        signal: "BUY",
-        aiScore: 90,
-        price: 1000
+
+        market: "NSE / BSE",
+
+        nifty: "READY",
+
+        bankNifty: "READY",
+
+        server: "ONLINE"
+
     });
 
 });
 
-// Live Quote API
-app.get("/api/live", async (req, res) => {
-
-    try {
-
-        const instrument =
-            req.query.instrument ||
-            "NSE_EQ|INE002A01018";
-
-        const data = await getQuote(instrument);
-
-        res.json(data);
-
-    } catch (err) {
-
-        res.status(500).json({
-            success: false,
-            error: err.response?.data || err.message
-        });
-
-    }
-
-});
+// ===============================
+// LOGIN
+// ===============================
 
 app.get("/login", (req, res) => {
 
-    const url =
-        "https://api.upstox.com/v2/login/authorization/dialog" +
-        "?response_type=code" +
-        "&client_id=" + process.env.UPSTOX_API_KEY +
-        "&redirect_uri=" + encodeURIComponent(process.env.UPSTOX_REDIRECT_URI);
+    const clientId =
+        process.env.UPSTOX_API_KEY;
 
-    res.redirect(url);
+    const redirectUri =
+        process.env.UPSTOX_REDIRECT_URI;
+
+    if (!clientId || !redirectUri) {
+
+        return res.status(500).send(
+            "Upstox API Key or Redirect URI is missing."
+        );
+
+    }
+
+    const loginUrl =
+        "https://api.upstox.com/v2/login/authorization/dialog" +
+
+        "?response_type=code" +
+
+        "&client_id=" +
+        encodeURIComponent(clientId) +
+
+        "&redirect_uri=" +
+        encodeURIComponent(redirectUri);
+
+    res.redirect(loginUrl);
 
 });
+
+// ===============================
+// CALLBACK
+// ===============================
+
+app.get("/callback", (req, res) => {
+
+    const code = req.query.code;
+
+    if (!code) {
+
+        return res.status(400).send(
+            "Authorization code not received."
+        );
+
+    }
+
+    res.send(`
+        <html>
+
+        <head>
+            <title>Upstox Login</title>
+        </head>
+
+        <body>
+
+            <h2>✅ Upstox Authorization Successful</h2>
+
+            <p>
+                Authorization code received.
+            </p>
+
+            <p>
+                Token exchange will be completed in the next module.
+            </p>
+
+        </body>
+
+        </html>
+    `);
+
+});
+
+// ===============================
+// SERVER
+// ===============================
+
 app.listen(PORT, () => {
-    console.log("Server running on port " + PORT);
+
+    console.log(
+        "AI Equity Scanner running on port " + PORT
+    );
+
 });
