@@ -28,29 +28,44 @@ async function scanStock() {
 
         console.log("LIVE API:", data);
 
-        if (!data.success) {
-
+        if (!data.success || !data.data) {
             result.innerHTML = `
-                <h2>⚠️ Unable to fetch data</h2>
-                <p>${data.message || "Stock data unavailable"}</p>
+                <h2>⚠️ Data unavailable</h2>
+                <p>${data.message || "Stock not found"}</p>
             `;
-
             return;
         }
 
-        const market = data.data;
+        // Upstox response contains instrument inside data object
+        const keys = Object.keys(data.data);
 
-        const symbol = market.symbol || stock;
-        const price = market.last_price ?? "-";
-        const volume = market.volume ?? "-";
-        const oi = market.oi ?? "-";
-        const change = market.net_change ?? "-";
+        if (keys.length === 0) {
+            throw new Error("No market data found");
+        }
+
+        const market = data.data[keys[0]];
+
+        const symbol =
+            market.symbol ||
+            stock.toUpperCase();
+
+        const price =
+            market.last_price ?? "-";
+
+        const volume =
+            market.volume ?? "-";
+
+        const oi =
+            market.oi ?? "-";
+
+        const change =
+            market.net_change ?? 0;
 
         let signal = "HOLD";
 
-        if (change > 0) {
+        if (Number(change) > 0) {
             signal = "BUY";
-        } else if (change < 0) {
+        } else if (Number(change) < 0) {
             signal = "SELL";
         }
 
@@ -86,23 +101,21 @@ async function scanStock() {
                 </p>
 
             </div>
-
         `;
 
     } catch (error) {
 
-        console.error(error);
+        console.error("Scanner Error:", error);
 
         result.innerHTML = `
-            <h2>❌ Connection Error</h2>
-            <p>Unable to connect to server.</p>
+            <h2>❌ Unable to load market data</h2>
             <p>Please try again.</p>
         `;
     }
 }
 
 
-// Search button / Enter key
+// Search on Enter
 document.addEventListener("DOMContentLoaded", () => {
 
     const input = document.getElementById("search");
