@@ -446,95 +446,364 @@ app.get("/api/live", async (req, res) => {
 });
 
 // ==========================================
-// STOCK SEARCH
+// STEP 10
+// UPSTOX DYNAMIC INSTRUMENT SEARCH
 // ==========================================
 
-app.get("/api/search", async (req, res) => {
-    try {
-        const query =
-            (req.query.q || "")
-            .trim()
-            .toUpperCase();
+const fs = require("fs");
 
-        if (!query) {
-            return res.status(400).json({
-                success: false,
-                message: "Search query required"
-            });
-        }
+let fallbackStocks = [];
 
-        // Current scanner list.
-        // More stocks can be added here later.
-        const stocks = [
-            {
-                symbol: "RELIANCE",
-                name: "Reliance Industries",
-                exchange: "NSE",
-                instrument: "NSE_EQ|INE002A01018"
-            },
-            {
-                symbol: "SBIN",
-                name: "State Bank of India",
-                exchange: "NSE",
-                instrument: "NSE_EQ|INE062A01020"
-            },
-            {
-                symbol: "INFY",
-                name: "Infosys",
-                exchange: "NSE",
-                instrument: "NSE_EQ|INE009A01021"
-            },
-            {
-                symbol: "TCS",
-                name: "Tata Consultancy Services",
-                exchange: "NSE",
-                instrument: "NSE_EQ|INE467B01029"
-            },
-            {
-                symbol: "HDFCBANK",
-                name: "HDFC Bank",
-                exchange: "NSE",
-                instrument: "NSE_EQ|INE040A01034"
-            },
-            {
-                symbol: "ICICIBANK",
-                name: "ICICI Bank",
-                exchange: "NSE",
-                instrument: "NSE_EQ|INE090A01021"
-            },
-            {
-                symbol: "ITC",
-                name: "ITC",
-                exchange: "NSE",
-                instrument: "NSE_EQ|INE154A01025"
-            },
-            {
-                symbol: "LT",
-                name: "Larsen & Toubro",
-                exchange: "NSE",
-                instrument: "NSE_EQ|INE018A01030"
-            }
-        ];
+try {
 
-        const results = stocks.filter(stock =>
-            stock.symbol.includes(query) ||
-            stock.name.toUpperCase().includes(query)
+    const stocksFile =
+        path.join(__dirname, "stocks.json");
+
+    const stocksData =
+        JSON.parse(
+            fs.readFileSync(
+                stocksFile,
+                "utf8"
+            )
         );
 
-        res.json({
-            success: true,
-            count: results.length,
-            results
-        });
-    } catch (error) {
-        console.error("SEARCH ERROR:", error.message);
+    fallbackStocks =
+        stocksData.aliases || [];
 
-        res.status(500).json({
-            success: false,
-            message: "Search failed"
-        });
+} catch (error) {
+
+    console.error(
+        "stocks.json load error:",
+        error.message
+    );
+
+}
+
+
+// ==========================================
+// UPSTOX INSTRUMENT SEARCH FUNCTION
+// ==========================================
+
+async function searchUpstoxInstruments(
+    query,
+    options = {}
+) {
+
+    const token =
+        process.env.UPSTOX_ACCESS_TOKEN;
+
+    if (!token) {
+
+        const error =
+            new Error(
+                "UPSTOX_ACCESS_TOKEN is missing in Render Environment."
+            );
+
+        error.statusCode = 500;
+
+        throw error;
+
     }
-});
+
+
+    const params = {
+
+        query: query,
+
+        exchanges:
+            options.exchanges ||
+            "NSE,BSE",
+
+        segments:
+            options.segments ||
+            "EQ,INDEX",
+
+        page_number: 1,
+
+        records: 30
+
+    };
+
+
+    if (options.instrumentTypes) {
+
+        params.instrument_types =
+            options.instrumentTypes;
+
+    }
+
+
+    const response =
+        await axios.get(
+
+            "https://api.upstox.com/v2/instruments/search",
+
+            {
+
+                headers: {
+
+                    "Content-Type":
+                        "application/json",
+
+                    "Accept":
+                        "application/json",
+
+                    "Authorization":
+                        `Bearer ${token}`
+
+                },
+
+                params: params,
+
+                timeout: 15000
+
+            }
+
+        );
+
+
+    return response.data;
+
+}
+
+
+// ==========================================
+// DYNAMIC STOCK SEARCH API
+// ==========================================
+
+app.get(
+    "/api/search",
+    async (req, res) => {
+
+        try {
+
+            const query =
+                (req.query.q || "")
+                .trim();
+
+
+            if (!query) {
+
+                return res.status(400).json({
+
+                    success: false,
+
+                    message:
+                        "Search query required"
+
+                });
+
+            }
+
+
+            // ==================================
+            // SEARCH UPSTOX
+            // ==================================
+
+            try {
+
+                const data =
+                    await searchUpstoxInstruments(
+
+                        query,
+
+                        {
+
+                            exchanges:
+                                "NSE,BSE",
+
+                            segments:
+                                "EQ,INDEX"
+
+                        }
+
+                    );
+
+
+                const instruments =
+                    Array.isArray(data?.data)
+                        ? data.data
+                        : [];
+
+
+                const results =
+                    instruments.map(
+                        item => ({
+
+                            symbol:
+                                item.trading_symbol ||
+                                item.short_name ||
+                                "",
+
+                            name:
+                                item.name ||
+                                item.short_name ||
+                                item.trading_symbol ||
+                                "",
+
+                            exchange:
+                                item.exchange ||
+                                "",
+
+                            segment:
+                                item.segment ||
+                                "",
+
+                            instrument_type:
+                                item.instrument_type ||
+                                "",
+
+                            instrument:
+                                item.instrument_key ||
+                                "",
+
+                            isin:
+                                item.isin ||
+                                "",
+
+                            lot_size:
+                                item.lot_size ||
+                                0,
+
+                            tick_size:
+                                item.tick_size ||
+                                0,
+
+                            expiry:
+                                item.expiry ||
+                                null,
+
+                            strike_price:
+                                item.strike_price ||
+                                null
+
+                        })
+                    );
+
+
+                if (
+                    results.length > 0
+                ) {
+
+                    return res.json({
+
+                        success: true,
+
+                        source:
+                            "Upstox Instrument Search",
+
+                        count:
+                            results.length,
+
+                        results:
+                            results
+
+                    });
+
+                }
+
+            } catch (searchError) {
+
+                console.error(
+
+                    "UPSTOX SEARCH ERROR:",
+
+                    searchError.response?.data ||
+                    searchError.message
+
+                );
+
+            }
+
+
+            // ==================================
+            // LOCAL FALLBACK
+            // ==================================
+
+            const upperQuery =
+                query.toUpperCase();
+
+
+            const results =
+                fallbackStocks.filter(
+                    stock =>
+
+                        stock.symbol
+                            .toUpperCase()
+                            .includes(
+                                upperQuery
+                            )
+
+                        ||
+
+                        stock.name
+                            .toUpperCase()
+                            .includes(
+                                upperQuery
+                            )
+
+                );
+
+
+            res.json({
+
+                success: true,
+
+                source:
+                    "Local fallback",
+
+                count:
+                    results.length,
+
+                results:
+                    results.map(
+                        stock => ({
+
+                            symbol:
+                                stock.symbol,
+
+                            name:
+                                stock.name,
+
+                            exchange:
+                                stock.exchange,
+
+                            segment:
+                                stock.segment,
+
+                            instrument:
+                                ""
+
+                        })
+                    )
+
+            });
+
+
+        } catch (error) {
+
+            console.error(
+
+                "SEARCH ERROR:",
+
+                error.message
+
+            );
+
+
+            res.status(500).json({
+
+                success: false,
+
+                message:
+                    "Stock search failed"
+
+            });
+
+        }
+
+    }
+);
 
 // ==========================================
 // STOCK SCAN
