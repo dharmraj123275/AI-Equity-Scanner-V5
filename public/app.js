@@ -1,346 +1,122 @@
-// =====================================
-// AI EQUITY SCANNER V5 - APP.JS
-// =====================================
+async function scanStock() {
 
-const resultBox = document.getElementById("result");
-const searchBox = document.getElementById("search");
+    const input = document.getElementById("search");
+    const result = document.getElementById("result");
 
-// =====================================
-// STOCK SEARCH
-// =====================================
+    const stock = input.value.trim();
 
-async function searchStock() {
-
-    const query = searchBox.value.trim();
-
-    if (!query) {
-        resultBox.innerHTML = `
-            <h3>🔍 Enter a stock name or symbol</h3>
+    if (!stock) {
+        result.innerHTML = `
+            <h2>⚠️ Enter a stock name</h2>
+            <p>Example: RELIANCE</p>
         `;
         return;
     }
 
-    resultBox.innerHTML = `
-        <h3>⏳ Searching ${query}...</h3>
+    result.innerHTML = `
+        <h2>🔄 Loading...</h2>
+        <p>Fetching live market data...</p>
     `;
 
     try {
 
         const response = await fetch(
-            "/api/search?q=" +
-            encodeURIComponent(query)
+            "/api/live?symbol=" + encodeURIComponent(stock)
         );
 
         const data = await response.json();
 
+        console.log("LIVE API:", data);
+
         if (!data.success) {
 
-            resultBox.innerHTML = `
-                <h3>❌ Search failed</h3>
-                <p>${data.message || ""}</p>
+            result.innerHTML = `
+                <h2>⚠️ Unable to fetch data</h2>
+                <p>${data.message || "Stock data unavailable"}</p>
             `;
 
             return;
         }
 
-        if (data.results.length === 0) {
+        const market = data.data;
 
-            resultBox.innerHTML = `
-                <h3>❌ Stock not found</h3>
-                <p>Try another NSE stock symbol.</p>
-            `;
+        const symbol = market.symbol || stock;
+        const price = market.last_price ?? "-";
+        const volume = market.volume ?? "-";
+        const oi = market.oi ?? "-";
+        const change = market.net_change ?? "-";
 
-            return;
+        let signal = "HOLD";
+
+        if (change > 0) {
+            signal = "BUY";
+        } else if (change < 0) {
+            signal = "SELL";
         }
 
-        showSearchResults(data.results);
+        result.innerHTML = `
 
-    } catch (error) {
+            <div class="stock-card">
 
-        console.error(error);
+                <h2>📊 ${symbol}</h2>
 
-        resultBox.innerHTML = `
-            <h3>❌ Server connection failed</h3>
-            <p>Please try again.</p>
-        `;
-
-    }
-}
-
-
-// =====================================
-// SHOW SEARCH RESULTS
-// =====================================
-
-function showSearchResults(stocks) {
-
-    let html = `
-        <h2>🔎 Search Results</h2>
-    `;
-
-    stocks.forEach(stock => {
-
-        html += `
-            <div
-                style="
-                    background:#0f172a;
-                    padding:15px;
-                    margin-top:10px;
-                    border-radius:10px;
-                    cursor:pointer;
-                "
-                onclick="loadLiveQuote('${stock.instrument}','${stock.symbol}')"
-            >
-
-                <h3>${stock.symbol}</h3>
+                <h1>₹${price}</h1>
 
                 <p>
-                    ${stock.name}
+                    <b>Change:</b>
+                    ${change}
                 </p>
 
-                <small>
-                    ${stock.exchange}
-                </small>
+                <p>
+                    <b>Volume:</b>
+                    ${volume}
+                </p>
+
+                <p>
+                    <b>OI:</b>
+                    ${oi}
+                </p>
+
+                <hr>
+
+                <h2>Signal: ${signal}</h2>
+
+                <p>
+                    🟢 Live Upstox Market Data
+                </p>
 
             </div>
+
         `;
-
-    });
-
-    resultBox.innerHTML = html;
-}
-
-
-// =====================================
-// LIVE QUOTE
-// =====================================
-
-async function loadLiveQuote(
-    instrument,
-    symbol
-) {
-
-    resultBox.innerHTML = `
-        <h2>⏳ Loading ${symbol}...</h2>
-    `;
-
-    try {
-
-        const response = await fetch(
-            "/api/live?instrument=" +
-            encodeURIComponent(instrument)
-        );
-
-        const data = await response.json();
-
-        if (!data.success) {
-
-            resultBox.innerHTML = `
-                <h2>❌ Live Data Error</h2>
-                <p>
-                    ${data.message || "Unable to fetch data"}
-                </p>
-            `;
-
-            return;
-        }
-
-        displayQuote(data.data, symbol);
 
     } catch (error) {
 
         console.error(error);
 
-        resultBox.innerHTML = `
+        result.innerHTML = `
             <h2>❌ Connection Error</h2>
-            <p>Unable to connect to Upstox.</p>
+            <p>Unable to connect to server.</p>
+            <p>Please try again.</p>
         `;
-
     }
-
 }
 
 
-// =====================================
-// DISPLAY QUOTE
-// =====================================
+// Search button / Enter key
+document.addEventListener("DOMContentLoaded", () => {
 
-function displayQuote(data, symbol) {
+    const input = document.getElementById("search");
 
-    console.log("Upstox Data:", data);
+    if (input) {
 
-    /*
-       Upstox response structure can contain
-       instrument-key based objects.
-
-       We extract the first available quote.
-    */
-
-    const quoteData =
-        Object.values(data.data || {})[0] || {};
-
-    const lastPrice =
-        quoteData.last_price ??
-        quoteData.last_traded_price ??
-        0;
-
-    const volume =
-        quoteData.volume ??
-        0;
-
-    const open =
-        quoteData.ohlc?.open ??
-        "-";
-
-    const high =
-        quoteData.ohlc?.high ??
-        "-";
-
-    const low =
-        quoteData.ohlc?.low ??
-        "-";
-
-    const close =
-        quoteData.ohlc?.close ??
-        "-";
-
-    resultBox.innerHTML = `
-
-        <h2>📈 ${symbol}</h2>
-
-        <div
-            style="
-                background:#0f172a;
-                padding:20px;
-                border-radius:12px;
-                margin-top:15px;
-            "
-        >
-
-            <h1>
-                ₹${Number(lastPrice).toFixed(2)}
-            </h1>
-
-            <hr style="margin:15px 0;">
-
-            <p>
-                <b>Open:</b> ₹${open}
-            </p>
-
-            <p>
-                <b>High:</b> ₹${high}
-            </p>
-
-            <p>
-                <b>Low:</b> ₹${low}
-            </p>
-
-            <p>
-                <b>Previous Close:</b> ₹${close}
-            </p>
-
-            <p>
-                <b>Volume:</b> ${volume}
-            </p>
-
-        </div>
-
-        <button
-            onclick="loadLiveQuote('${Object.keys(data.data || {})[0]}','${symbol}')"
-            style="
-                margin-top:15px;
-                padding:10px 15px;
-                border:0;
-                border-radius:8px;
-                cursor:pointer;
-            "
-        >
-            🔄 Refresh
-        </button>
-    `;
-}
-
-
-// =====================================
-// MARKET STATUS
-// =====================================
-
-async function loadMarketStatus() {
-
-    const statusBox =
-        document.getElementById("marketStatus");
-
-    const updateBox =
-        document.getElementById("lastUpdate");
-
-    if (!statusBox) return;
-
-    try {
-
-        const response =
-            await fetch("/api/status");
-
-        const data =
-            await response.json();
-
-        statusBox.innerHTML =
-            `🟢 ${data.market || "Market Ready"}`;
-
-        if (updateBox) {
-
-            updateBox.innerHTML =
-                "Server: 🟢 Online";
-
-        }
-
-    } catch (error) {
-
-        statusBox.innerHTML =
-            "🔴 Server Offline";
-
-        if (updateBox) {
-
-            updateBox.innerHTML =
-                "Unable to connect";
-
-        }
-
-    }
-
-}
-
-
-// =====================================
-// SEARCH ENTER KEY
-// =====================================
-
-if (searchBox) {
-
-    searchBox.addEventListener(
-        "keydown",
-        function(event) {
+        input.addEventListener("keydown", function(event) {
 
             if (event.key === "Enter") {
-
-                searchStock();
-
+                scanStock();
             }
 
-        }
-    );
-
-}
-
-
-// =====================================
-// START
-// =====================================
-
-window.addEventListener(
-    "load",
-    function() {
-
-        loadMarketStatus();
+        });
 
     }
-);
+
+});
