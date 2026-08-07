@@ -3,16 +3,22 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const axios = require("axios");
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-// Frontend
+// ===============================
+// FRONTEND
+// ===============================
+
 app.use(express.static(path.join(__dirname, "public")));
 
 const PORT = process.env.PORT || 3000;
+
+const ACCESS_TOKEN = process.env.UPSTOX_ACCESS_TOKEN;
 
 // ===============================
 // HOME
@@ -39,46 +45,71 @@ app.get("/api/health", (req, res) => {
 });
 
 // ===============================
-// Market Status
+// MARKET STATUS
+// ===============================
+
 app.get("/api/status", (req, res) => {
-  const now = new Date();
 
-  // India time
-  const indiaTime = new Date(
-    now.toLocaleString("en-US", {
-      timeZone: "Asia/Kolkata"
-    })
-  );
+    const now = new Date();
 
-  const day = indiaTime.getDay();
-  const hours = indiaTime.getHours();
-  const minutes = indiaTime.getMinutes();
+    const indiaTime = new Date(
+        now.toLocaleString("en-US", {
+            timeZone: "Asia/Kolkata"
+        })
+    );
 
-  const currentMinutes = hours * 60 + minutes;
+    const day = indiaTime.getDay();
+    const hours = indiaTime.getHours();
+    const minutes = indiaTime.getMinutes();
 
-  // NSE market: Monday-Friday, 9:15 AM to 3:30 PM
-  const marketOpen = 9 * 60 + 15;
-  const marketClose = 15 * 60 + 30;
+    const currentMinutes =
+        hours * 60 + minutes;
 
-  const isWeekday = day >= 1 && day <= 5;
-  const isOpen =
-    isWeekday &&
-    currentMinutes >= marketOpen &&
-    currentMinutes <= marketClose;
+    const marketOpen =
+        9 * 60 + 15;
 
-  res.json({
-    success: true,
-    market: isOpen ? "🟢 MARKET LIVE" : "🔴 MARKET CLOSED",
-    nifty: isOpen ? "🟢 Live" : "🔴 Closed",
-    bankNifty: isOpen ? "🟢 Live" : "🔴 Closed",
-    time: indiaTime.toLocaleTimeString("en-IN"),
-    date: indiaTime.toLocaleDateString("en-IN")
-  });
+    const marketClose =
+        15 * 60 + 30;
+
+    const isWeekday =
+        day >= 1 && day <= 5;
+
+    const isOpen =
+        isWeekday &&
+        currentMinutes >= marketOpen &&
+        currentMinutes <= marketClose;
+
+    res.json({
+
+        success: true,
+
+        market:
+            isOpen
+                ? "🟢 MARKET LIVE"
+                : "🔴 MARKET CLOSED",
+
+        nifty:
+            isOpen
+                ? "🟢 Live"
+                : "🔴 Closed",
+
+        bankNifty:
+            isOpen
+                ? "🟢 Live"
+                : "🔴 Closed",
+
+        time:
+            indiaTime.toLocaleTimeString("en-IN"),
+
+        date:
+            indiaTime.toLocaleDateString("en-IN")
+
+    });
+
 });
-    
 
 // ===============================
-// LOGIN
+// UPSTOX LOGIN
 // ===============================
 
 app.get("/login", (req, res) => {
@@ -99,12 +130,9 @@ app.get("/login", (req, res) => {
 
     const loginUrl =
         "https://api.upstox.com/v2/login/authorization/dialog" +
-
         "?response_type=code" +
-
         "&client_id=" +
         encodeURIComponent(clientId) +
-
         "&redirect_uri=" +
         encodeURIComponent(redirectUri);
 
@@ -113,58 +141,7 @@ app.get("/login", (req, res) => {
 });
 
 // ===============================
-// CALLBACK
-// ===============================
-
-app.get("/callback", (req, res) => {
-
-    const code = req.query.code;
-
-    if (!code) {
-
-        return res.status(400).send(
-            "Authorization code not received."
-        );
-
-    }
-
-    res.send(`
-        <html>
-
-        <head>
-            <title>Upstox Login</title>
-        </head>
-
-        <body>
-
-            <h2>✅ Upstox Authorization Successful</h2>
-
-            <p>
-                Authorization code received.
-            </p>
-
-            <p>
-                Token exchange will be completed in the next module.
-            </p>
-
-        </body>
-
-        </html>
-    `);
-
-});
-
-// ===============================
-// SERVER
-// ===============================
-// ===============================
-// UPSTOX TOKEN EXCHANGE
-// ===============================
-
-const axios = require("axios");
-
-// ===============================
-// UPSTOX OAUTH CALLBACK
+// UPSTOX CALLBACK
 // ===============================
 
 app.get("/callback", async (req, res) => {
@@ -172,53 +149,71 @@ app.get("/callback", async (req, res) => {
     const code = req.query.code;
 
     if (!code) {
+
         return res.status(400).send(`
             <h2>❌ Authorization Failed</h2>
             <p>No authorization code received.</p>
         `);
+
     }
 
     try {
 
         const response = await axios.post(
+
             "https://api.upstox.com/v2/login/authorization/token",
 
             new URLSearchParams({
+
                 code: code,
-                client_id: process.env.UPSTOX_API_KEY,
-                client_secret: process.env.UPSTOX_API_SECRET,
-                redirect_uri: process.env.UPSTOX_REDIRECT_URI,
-                grant_type: "authorization_code"
+
+                client_id:
+                    process.env.UPSTOX_API_KEY,
+
+                client_secret:
+                    process.env.UPSTOX_API_SECRET,
+
+                redirect_uri:
+                    process.env.UPSTOX_REDIRECT_URI,
+
+                grant_type:
+                    "authorization_code"
+
             }),
 
             {
                 headers: {
                     "Content-Type":
                         "application/x-www-form-urlencoded",
-                    "Accept": "application/json"
+
+                    "Accept":
+                        "application/json"
                 }
             }
+
         );
 
-        const accessToken =
-            response.data.access_token;
-
-        console.log("Upstox OAuth Login Successful");
+        console.log(
+            "Upstox OAuth Login Successful"
+        );
 
         // IMPORTANT:
-        // Token is kept server-side only.
-        // Do NOT send access token to browser.
+        // Access token is NOT sent to browser.
 
         res.send(`
             <html>
 
             <head>
-                <title>Upstox Connected</title>
+
+                <title>
+                    Upstox Connected
+                </title>
 
                 <meta
                     name="viewport"
                     content="width=device-width, initial-scale=1.0"
                 >
+
             </head>
 
             <body
@@ -256,80 +251,16 @@ app.get("/callback", async (req, res) => {
             <h2>❌ Upstox Connection Failed</h2>
 
             <p>
-                ${JSON.stringify(
-                    error.response?.data ||
-                    error.message
-                )}
+                Please check Render environment variables.
             </p>
         `);
+
     }
 
 });
-
 
 // ===============================
 // LIVE UPSTOX QUOTE
-// ===============================
-
-app.get("/api/live", async (req, res) => {
-
-    try {
-
-        const instrument =
-            req.query.instrument ||
-            "NSE_EQ|INE002A01018";
-
-        const token =
-            process.env.UPSTOX_ACCESS_TOKEN;
-
-        if (!token) {
-
-            return res.status(500).json({
-                success: false,
-                message:
-                    "UPSTOX_ACCESS_TOKEN is missing in Render Environment."
-            });
-
-        }
-
-        const response = await axios.get(
-            "https://api.upstox.com/v2/market-quote/quotes",
-            {
-                headers: {
-                    "Accept": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                params: {
-                    instrument_key: instrument
-                }
-            }
-        );
-
-        res.json({
-            success: true,
-            data: response.data
-        });
-
-    } catch (error) {
-
-        console.error(
-            "Upstox Quote Error:",
-            error.response?.data || error.message
-        );
-
-        res.status(500).json({
-            success: false,
-            message: "Unable to fetch live quote",
-            error:
-                error.response?.data ||
-                error.message
-        });
-
-    }
-
-});
-// ===============================
-// LIVE QUOTE API
 // ===============================
 
 app.get("/api/live", async (req, res) => {
@@ -342,135 +273,380 @@ app.get("/api/live", async (req, res) => {
         if (!instrument) {
 
             return res.status(400).json({
+
                 success: false,
-                message: "Instrument key is required"
+
+                message:
+                    "Instrument key is required"
+
             });
 
         }
 
-        const token =
-            process.env.UPSTOX_ACCESS_TOKEN;
-
-        if (!token) {
+        if (!ACCESS_TOKEN) {
 
             return res.status(500).json({
+
                 success: false,
-                message: "Upstox Access Token is missing"
+
+                message:
+                    "UPSTOX_ACCESS_TOKEN is missing in Render Environment."
+
             });
 
         }
 
-        const response = await axios.get(
-            "https://api.upstox.com/v2/market-quote/quotes",
-            {
-                headers: {
-                    "Accept": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                params: {
-                    instrument_key: instrument
+        const response =
+            await axios.get(
+
+                "https://api.upstox.com/v2/market-quote/quotes",
+
+                {
+
+                    headers: {
+
+                        "Accept":
+                            "application/json",
+
+                        "Authorization":
+                            `Bearer ${ACCESS_TOKEN}`
+
+                    },
+
+                    params: {
+
+                        instrument_key:
+                            instrument
+
+                    }
+
                 }
-            }
-        );
+
+            );
 
         res.json({
+
             success: true,
+
             data: response.data
+
         });
 
     } catch (error) {
 
         console.error(
+
             "Live Quote Error:",
+
             error.response?.data ||
             error.message
+
         );
 
         res.status(500).json({
+
             success: false,
-            message: "Live quote failed",
+
+            message:
+                "Unable to fetch live quote",
+
             error:
                 error.response?.data ||
                 error.message
+
         });
 
     }
 
 });
+
 // ===============================
-// STOCK SEARCH API
+// STOCK SEARCH
 // ===============================
 
 app.get("/api/search", async (req, res) => {
 
     const query =
-        (req.query.q || "").trim().toUpperCase();
+        (req.query.q || "")
+        .trim()
+        .toUpperCase();
 
     if (!query) {
 
         return res.status(400).json({
+
             success: false,
-            message: "Search query required"
+
+            message:
+                "Search query required"
+
         });
 
     }
 
+    const stocks = [
+
+        {
+            symbol: "RELIANCE",
+            name: "Reliance Industries",
+            exchange: "NSE",
+            instrument:
+                "NSE_EQ|INE002A01018"
+        },
+
+        {
+            symbol: "SBIN",
+            name: "State Bank of India",
+            exchange: "NSE",
+            instrument:
+                "NSE_EQ|INE062A01020"
+        },
+
+        {
+            symbol: "INFY",
+            name: "Infosys",
+            exchange: "NSE",
+            instrument:
+                "NSE_EQ|INE009A01021"
+        }
+
+    ];
+
+    const results =
+        stocks.filter(stock =>
+
+            stock.symbol.includes(query) ||
+
+            stock.name
+                .toUpperCase()
+                .includes(query)
+
+        );
+
+    res.json({
+
+        success: true,
+
+        count:
+            results.length,
+
+        results:
+            results
+
+    });
+
+});
+
+// ===============================
+// STOCK SCAN
+// ===============================
+
+app.get("/api/scan", async (req, res) => {
+
     try {
 
-        // Temporary search list.
-        // Later we will connect the complete
-        // NSE + BSE + SME instrument master.
+        const stock =
+            (req.query.stock || "")
+            .trim()
+            .toUpperCase();
 
-        const stocks = [
-            {
-                symbol: "RELIANCE",
-                name: "Reliance Industries",
-                exchange: "NSE",
-                instrument:
-                    "NSE_EQ|INE002A01018"
-            },
-            {
-                symbol: "SBIN",
-                name: "State Bank of India",
-                exchange: "NSE",
-                instrument:
-                    "NSE_EQ|INE062A01020"
-            },
-            {
-                symbol: "INFY",
-                name: "Infosys",
-                exchange: "NSE",
-                instrument:
-                    "NSE_EQ|INE009A01021"
-            }
-        ];
+        if (!stock) {
 
-        const results =
-            stocks.filter(stock =>
-                stock.symbol.includes(query) ||
-                stock.name.toUpperCase().includes(query)
+            return res.status(400).json({
+
+                success: false,
+
+                message:
+                    "Please enter stock symbol"
+
+            });
+
+        }
+
+        if (!ACCESS_TOKEN) {
+
+            return res.status(500).json({
+
+                success: false,
+
+                message:
+                    "UPSTOX_ACCESS_TOKEN is missing"
+
+            });
+
+        }
+
+        // Known NSE instruments
+
+        const instruments = {
+
+            RELIANCE:
+                "NSE_EQ|INE002A01018",
+
+            SBIN:
+                "NSE_EQ|INE062A01020",
+
+            INFY:
+                "NSE_EQ|INE009A01021"
+
+        };
+
+        const instrument =
+            instruments[stock];
+
+        if (!instrument) {
+
+            return res.status(404).json({
+
+                success: false,
+
+                message:
+                    `${stock} is not available in current scanner list`
+
+            });
+
+        }
+
+        const response =
+            await axios.get(
+
+                "https://api.upstox.com/v2/market-quote/quotes",
+
+                {
+
+                    headers: {
+
+                        "Accept":
+                            "application/json",
+
+                        "Authorization":
+                            `Bearer ${ACCESS_TOKEN}`
+
+                    },
+
+                    params: {
+
+                        instrument_key:
+                            instrument
+
+                    }
+
+                }
+
             );
 
+        const data =
+            response.data?.data;
+
+        if (!data ||
+            Object.keys(data).length === 0) {
+
+            return res.status(404).json({
+
+                success: false,
+
+                message:
+                    "Live data not found"
+
+            });
+
+        }
+
+        const quote =
+            Object.values(data)[0];
+
+        const price =
+            Number(
+                quote.last_price || 0
+            );
+
+        const change =
+            Number(
+                quote.net_change || 0
+            );
+
+        const volume =
+            Number(
+                quote.volume || 0
+            );
+
+        const oi =
+            Number(
+                quote.oi || 0
+            );
+
+        let signal = "HOLD";
+
+        if (change > 0) {
+
+            signal = "BUY";
+
+        } else if (change < 0) {
+
+            signal = "SELL";
+
+        }
+
         res.json({
+
             success: true,
-            count: results.length,
-            results: results
+
+            name: stock,
+
+            symbol: stock,
+
+            price: price,
+
+            change: change,
+
+            volume: volume,
+
+            oi: oi,
+
+            signal: signal,
+
+            source:
+                "Upstox Live Market Data"
+
         });
 
     } catch (error) {
 
+        console.error(
+
+            "SCAN ERROR:",
+
+            error.response?.data ||
+            error.message
+
+        );
+
         res.status(500).json({
+
             success: false,
-            message: "Search failed"
+
+            message:
+                "Unable to fetch live stock data",
+
+            error:
+                error.response?.data ||
+                error.message
+
         });
 
     }
 
 });
+
+// ===============================
+// SERVER START
+// ===============================
+
 app.listen(PORT, () => {
 
     console.log(
-        "AI Equity Scanner running on port " + PORT
+        "AI Equity Scanner running on port " +
+        PORT
     );
 
 });
