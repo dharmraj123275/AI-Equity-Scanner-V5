@@ -259,96 +259,303 @@ app.get("/callback", async (req, res) => {
 
 });
 
-// ===============================
-// LIVE UPSTOX QUOTE
-// ===============================
+// ==========================================
+// LIVE QUOTE + AI ANALYSIS
+// ==========================================
 
 app.get("/api/live", async (req, res) => {
 
     try {
 
-        const instrument =
-            req.query.instrument;
+        const instrument = req.query.instrument;
 
         if (!instrument) {
-
             return res.status(400).json({
-
                 success: false,
-
-                message:
-                    "Instrument key is required"
-
+                message: "Instrument key is required"
             });
-
         }
 
-        if (!ACCESS_TOKEN) {
+        const token = process.env.UPSTOX_ACCESS_TOKEN;
 
+        if (!token) {
             return res.status(500).json({
-
                 success: false,
-
-                message:
-                    "UPSTOX_ACCESS_TOKEN is missing in Render Environment."
-
+                message: "Upstox Access Token is missing"
             });
+        }
+
+        const response = await axios.get(
+            "https://api.upstox.com/v2/market-quote/quotes",
+            {
+                headers: {
+                    "Accept": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                params: {
+                    instrument_key: instrument
+                }
+            }
+        );
+
+        const quoteData = response.data?.data || {};
+
+        const keys = Object.keys(quoteData);
+
+        if (keys.length === 0) {
+            return res.json({
+                success: false,
+                message: "No quote data available"
+            });
+        }
+
+        const quote = quoteData[instrument] || quoteData[keys[0]];
+
+        const price = Number(quote.last_price || 0);
+
+        const ohlc = quote.ohlc || {};
+
+        const open = Number(ohlc.open || 0);
+        const high = Number(ohlc.high || 0);
+        const low = Number(ohlc.low || 0);
+        const close = Number(ohlc.close || 0);
+
+        // IMPORTANT: Actual Upstox change
+        const netChange =
+            Number(
+                quote.net_change ??
+                (price - close)
+            );
+
+        const changePercent =
+            close > 0
+                ? (netChange / close) * 100
+                : 0;
+
+        const volume =
+            Number(quote.volume || 0);
+
+        const oi =
+            Number(quote.oi || 0);
+
+        // ==========================================
+        // SUPPORT / RESISTANCE
+        // ==========================================
+
+        const support = low;
+
+        const resistance = high;
+
+        // ==========================================
+        // TREND
+        // ==========================================
+
+        let trend = "SIDEWAYS";
+
+        if (price > open && price >= close) {
+            trend = "BULLISH";
+        }
+
+        if (price < open && price <= close) {
+            trend = "BEARISH";
+        }
+
+        // ==========================================
+        // AI SCORE
+        // ==========================================
+
+        let score = 50;
+
+        if (netChange > 0) score += 15;
+        if (netChange < 0) score -= 15;
+
+        if (price > open) score += 10;
+        if (price < open) score -= 10;
+
+        if (price > close) score += 5;
+        if (price < close) score -= 5;
+
+        score = Math.max(0, Math.min(100, score));
+
+        // ==========================================
+        // ENTRY / TARGET / STOP LOSS
+        // ==========================================
+
+        let entry = price;
+        let target1 = price;
+        let target2 = price;
+        let stopLoss = price;
+        let signal = "HOLD";
+
+        if (trend === "BULLISH") {
+
+            signal = "BUY";
+
+            entry = price;
+
+            target1 =
+                price + ((resistance - price) * 0.50);
+
+            target2 =
+                resistance;
+
+            stopLoss =
+                support;
+
+        } else if (trend === "BEARISH") {
+
+            signal = "SELL";
+
+            entry = price;
+
+            target1 =
+                price - ((price - support) * 0.50);
+
+            target2 =
+                support;
+
+            stopLoss =
+                resistance;
 
         }
 
-        const response =
-            await axios.get(
+        // ==========================================
+        // RISK REWARD
+        // ==========================================
 
-                "https://api.upstox.com/v2/market-quote/quotes",
+        let riskReward = 0;
 
-                {
+        if (signal === "BUY") {
 
-                    headers: {
+            const risk =
+                entry - stopLoss;
 
-                        "Accept":
-                            "application/json",
+            const reward =
+                target1 - entry;
 
-                        "Authorization":
-                            `Bearer ${ACCESS_TOKEN}`
+            if (risk > 0) {
+                riskReward =
+                    reward / risk;
+            }
 
-                    },
+        }
 
-                    params: {
+        if (signal === "SELL") {
 
-                        instrument_key:
-                            instrument
+            const risk =
+                stopLoss - entry;
 
-                    }
+            const reward =
+                entry - target1;
 
-                }
+            if (risk > 0) {
+                riskReward =
+                    reward / risk;
+            }
 
+        }
+
+        // ==========================================
+        // MARKET DEPTH
+        // ==========================================
+
+        const depth = quote.depth || {};
+
+        const buy =
+            depth.buy || [];
+
+        const sell =
+            depth.sell || [];
+
+        const buyQuantity =
+            buy.reduce(
+                (sum, item) =>
+                    sum + Number(item.quantity || 0),
+                0
             );
+
+        const sellQuantity =
+            sell.reduce(
+                (sum, item) =>
+                    sum + Number(item.quantity || 0),
+                0
+            );
+
+        // ==========================================
+        // FINAL RESPONSE
+        // ==========================================
 
         res.json({
 
             success: true,
 
-            data: response.data
+            data: {
+
+                price,
+
+                netChange,
+
+                changePercent,
+
+                open,
+
+                high,
+
+                low,
+
+                close,
+
+                volume,
+
+                oi,
+
+                support,
+
+                resistance,
+
+                trend,
+
+                aiScore: score,
+
+                signal,
+
+                entry,
+
+                target1,
+
+                target2,
+
+                stopLoss,
+
+                riskReward,
+
+                marketDepth: {
+
+                    buyQuantity,
+
+                    sellQuantity
+
+                },
+
+                raw: quote
+
+            }
 
         });
 
     } catch (error) {
 
         console.error(
-
             "Live Quote Error:",
-
             error.response?.data ||
             error.message
-
         );
 
         res.status(500).json({
 
             success: false,
 
-            message:
-                "Unable to fetch live quote",
+            message: "Live quote failed",
 
             error:
                 error.response?.data ||
