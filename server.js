@@ -377,47 +377,96 @@ app.get("/api/live", async (req, res) => {
 
         score = Math.max(0, Math.min(100, score));
 
-        // ==========================================
-        // ENTRY / TARGET / STOP LOSS
-        // ==========================================
+// ==========================================
+// SMART ENTRY / TARGET / STOP LOSS
+// ==========================================
 
-        let entry = price;
-        let target1 = price;
-        let target2 = price;
-        let stopLoss = price;
-        let signal = "HOLD";
+let entry = price;
+let target1 = price;
+let target2 = price;
+let stopLoss = price;
+let signal = "HOLD";
 
-        if (trend === "BULLISH") {
+if (trend === "BULLISH") {
 
-            signal = "BUY";
+    entry = price;
 
-            entry = price;
+    // Risk = 0.5% of entry
+    const risk = price * 0.005;
 
-            target1 =
-                price + ((resistance - price) * 0.50);
+    stopLoss = Math.max(
+        support,
+        price - risk
+    );
 
-            target2 =
-                resistance;
+    // Minimum 1.5R target
+    target1 = price + (price - stopLoss) * 1.5;
 
-            stopLoss =
-                support;
+    // Resistance as second target if higher
+    target2 = Math.max(
+        target1,
+        resistance
+    );
 
-        } else if (trend === "BEARISH") {
+    const reward =
+        target1 - entry;
 
-            signal = "SELL";
+    const actualRisk =
+        entry - stopLoss;
 
-            entry = price;
+    riskReward =
+        actualRisk > 0
+            ? reward / actualRisk
+            : 0;
 
-            target1 =
-                price - ((price - support) * 0.50);
+    // BUY only when RR is acceptable
+    if (riskReward >= 1.5) {
+        signal = "BUY";
+    } else {
+        signal = "HOLD";
+    }
 
-            target2 =
-                support;
+} else if (trend === "BEARISH") {
 
-            stopLoss =
-                resistance;
+    entry = price;
 
-        }
+    const risk = price * 0.005;
+
+    stopLoss = Math.min(
+        resistance,
+        price + risk
+    );
+
+    target1 =
+        price - (stopLoss - price) * 1.5;
+
+    target2 =
+        Math.min(
+            target1,
+            support
+        );
+
+    const reward =
+        entry - target1;
+
+    const actualRisk =
+        stopLoss - entry;
+
+    riskReward =
+        actualRisk > 0
+            ? reward / actualRisk
+            : 0;
+
+    if (riskReward >= 1.5) {
+        signal = "SELL";
+    } else {
+        signal = "HOLD";
+    }
+
+} else {
+
+    signal = "HOLD";
+}
 
         // ==========================================
         // RISK REWARD
