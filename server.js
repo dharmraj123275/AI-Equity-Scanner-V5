@@ -39,24 +39,43 @@ app.get("/api/health", (req, res) => {
 });
 
 // ===============================
-// MARKET STATUS
-// ===============================
-
+// Market Status
 app.get("/api/status", (req, res) => {
+  const now = new Date();
 
-    res.json({
+  // India time
+  const indiaTime = new Date(
+    now.toLocaleString("en-US", {
+      timeZone: "Asia/Kolkata"
+    })
+  );
 
-        market: "NSE / BSE",
+  const day = indiaTime.getDay();
+  const hours = indiaTime.getHours();
+  const minutes = indiaTime.getMinutes();
 
-        nifty: "READY",
+  const currentMinutes = hours * 60 + minutes;
 
-        bankNifty: "READY",
+  // NSE market: Monday-Friday, 9:15 AM to 3:30 PM
+  const marketOpen = 9 * 60 + 15;
+  const marketClose = 15 * 60 + 30;
 
-        server: "ONLINE"
+  const isWeekday = day >= 1 && day <= 5;
+  const isOpen =
+    isWeekday &&
+    currentMinutes >= marketOpen &&
+    currentMinutes <= marketClose;
 
-    });
-
+  res.json({
+    success: true,
+    market: isOpen ? "🟢 MARKET LIVE" : "🔴 MARKET CLOSED",
+    nifty: isOpen ? "🟢 Live" : "🔴 Closed",
+    bankNifty: isOpen ? "🟢 Live" : "🔴 Closed",
+    time: indiaTime.toLocaleTimeString("en-IN"),
+    date: indiaTime.toLocaleDateString("en-IN")
+  });
 });
+    
 
 // ===============================
 // LOGIN
