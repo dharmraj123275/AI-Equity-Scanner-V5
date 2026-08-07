@@ -1,104 +1,298 @@
-async function scanStock() {
+// ==========================================
+// AI EQUITY SCANNER PRO V5
+// Frontend JavaScript
+// ==========================================
 
-    const input = document.getElementById("search");
-    const result = document.getElementById("result");
+const searchInput = document.getElementById("search");
+const resultBox = document.getElementById("result");
 
-    const stock = input.value.trim().toUpperCase();
 
-    if (!stock) {
-        result.innerHTML = `
-            <h2>⚠️ Enter a stock name</h2>
-            <p>Example: RELIANCE</p>
-        `;
-        return;
-    }
+// ==========================================
+// MARKET STATUS
+// ==========================================
 
-    result.innerHTML = `
-        <h2>🔄 Loading...</h2>
-        <p>Fetching live Upstox data...</p>
-    `;
+async function loadMarketStatus() {
+
+    const marketStatus =
+        document.getElementById("marketStatus");
+
+    const lastUpdate =
+        document.getElementById("lastUpdate");
 
     try {
 
-        const response = await fetch(
-            "/api/live?symbol=" + encodeURIComponent(stock)
-        );
+        const response =
+            await fetch("/api/status");
 
-        const responseData = await response.json();
+        const data =
+            await response.json();
 
-        console.log("UPSTOX RESPONSE:", responseData);
+        marketStatus.innerText =
+            data.market || "Market Status Unknown";
 
-        if (!responseData.success) {
-            result.innerHTML = `
-                <h2>⚠️ API Error</h2>
-                <p>${responseData.message || "Unable to fetch data"}</p>
+        lastUpdate.innerText =
+            `${data.date || ""} • ${data.time || ""}`;
+
+    } catch (error) {
+
+        marketStatus.innerText =
+            "🔴 Server Connection Error";
+
+        lastUpdate.innerText =
+            "Unable to load market status";
+
+    }
+}
+
+
+// ==========================================
+// SEARCH STOCK
+// ==========================================
+
+async function searchStock() {
+
+    const query =
+        searchInput.value.trim();
+
+    if (!query) {
+
+        resultBox.innerHTML = `
+            <div class="status-card">
+                <h2>⚠️ Enter Stock Name</h2>
+                <p>Example: RELIANCE, SBIN, INFY</p>
+            </div>
+        `;
+
+        return;
+    }
+
+
+    resultBox.innerHTML = `
+        <div class="status-card">
+            <h2>🔎 Searching...</h2>
+            <p>Finding ${query.toUpperCase()}</p>
+        </div>
+    `;
+
+
+    try {
+
+        // --------------------------------------
+        // STEP 1: SEARCH STOCK
+        // --------------------------------------
+
+        const searchResponse =
+            await fetch(
+                "/api/search?q=" +
+                encodeURIComponent(query)
+            );
+
+        const searchData =
+            await searchResponse.json();
+
+
+        if (
+            !searchData.success ||
+            !searchData.results ||
+            searchData.results.length === 0
+        ) {
+
+            resultBox.innerHTML = `
+                <div class="status-card">
+                    <h2>❌ Stock Not Found</h2>
+                    <p>
+                        No stock found for
+                        <b>${query.toUpperCase()}</b>
+                    </p>
+                </div>
             `;
+
             return;
         }
 
-        /*
-         * Actual API structure:
-         *
-         * responseData
-         *   └── data
-         *       └── data
-         *           └── NSE_EQ|RELIANCE
-         */
 
-        const marketData = responseData.data?.data;
+        // --------------------------------------
+        // FIRST SEARCH RESULT
+        // --------------------------------------
 
-        if (!marketData) {
-            throw new Error("Market data not found");
+        const stock =
+            searchData.results[0];
+
+        const instrument =
+            stock.instrument;
+
+
+        // --------------------------------------
+        // STEP 2: GET LIVE QUOTE
+        // --------------------------------------
+
+        const liveResponse =
+            await fetch(
+                "/api/live?instrument=" +
+                encodeURIComponent(instrument)
+            );
+
+
+        const liveData =
+            await liveResponse.json();
+
+
+        if (!liveData.success) {
+
+            resultBox.innerHTML = `
+                <div class="status-card">
+                    <h2>⚠️ API Error</h2>
+                    <p>
+                        ${liveData.message || "Unable to fetch live data"}
+                    </p>
+                </div>
+            `;
+
+            return;
         }
 
-        const keys = Object.keys(marketData);
 
-        if (keys.length === 0) {
-            throw new Error("No stock data found");
+        // --------------------------------------
+        // STEP 3: EXTRACT UPSTOX DATA
+        // --------------------------------------
+
+        const quoteData =
+            liveData.data?.data || {};
+
+        const quote =
+            quoteData[instrument];
+
+
+        if (!quote) {
+
+            resultBox.innerHTML = `
+                <div class="status-card">
+                    <h2>⚠️ No Quote Data</h2>
+                    <p>
+                        Live data not available for
+                        ${stock.name}
+                    </p>
+                </div>
+            `;
+
+            return;
         }
 
-        const market = marketData[keys[0]];
 
-        const price = market.last_price ?? "-";
-        const volume = market.volume ?? "-";
-        const oi = market.oi ?? "-";
-        const change = market.net_change ?? 0;
+        // --------------------------------------
+        // PRICE
+        // --------------------------------------
 
-        const symbol =
-            market.symbol ||
-            stock;
+        const price =
+            quote.last_price ?? 0;
+
+
+        // --------------------------------------
+        // PREVIOUS CLOSE
+        // --------------------------------------
+
+        const previousClose =
+            quote.ohlc?.close ?? 0;
+
+
+        // --------------------------------------
+        // CHANGE
+        // --------------------------------------
+
+        const change =
+            previousClose
+                ? (price - previousClose).toFixed(2)
+                : "0.00";
+
+
+        // --------------------------------------
+        // CHANGE %
+        // --------------------------------------
+
+        const changePercent =
+            previousClose
+                ? (((price - previousClose) /
+                    previousClose) * 100).toFixed(2)
+                : "0.00";
+
+
+        // --------------------------------------
+        // VOLUME
+        // --------------------------------------
+
+        const volume =
+            quote.volume ?? 0;
+
+
+        // --------------------------------------
+        // OI
+        // --------------------------------------
+
+        const oi =
+            quote.oi ?? 0;
+
+
+        // --------------------------------------
+        // SIMPLE SIGNAL
+        // --------------------------------------
 
         let signal = "HOLD";
 
-        if (Number(change) > 0) {
+        if (changePercent >= 1) {
+
+            signal = "STRONG BUY";
+
+        } else if (changePercent > 0) {
+
             signal = "BUY";
-        }
 
-        if (Number(change) < 0) {
+        } else if (changePercent <= -1) {
+
+            signal = "STRONG SELL";
+
+        } else if (changePercent < 0) {
+
             signal = "SELL";
+
         }
 
-        result.innerHTML = `
 
-            <div class="stock-card">
+        // --------------------------------------
+        // DISPLAY RESULT
+        // --------------------------------------
 
-                <h2>📊 ${symbol}</h2>
+        resultBox.innerHTML = `
 
-                <h1>₹${price}</h1>
+            <div class="status-card">
+
+                <h2>
+                    📊 ${stock.symbol}
+                </h2>
+
+                <p>
+                    ${stock.name}
+                </p>
+
+                <hr>
+
+                <h1>
+                    ₹${Number(price).toFixed(2)}
+                </h1>
 
                 <p>
                     <b>Change:</b>
                     ${change}
+                    (${changePercent}%)
                 </p>
 
                 <p>
                     <b>Volume:</b>
-                    ${volume}
+                    ${Number(volume).toLocaleString("en-IN")}
                 </p>
 
                 <p>
                     <b>OI:</b>
-                    ${oi}
+                    ${Number(oi).toLocaleString("en-IN")}
                 </p>
 
                 <hr>
@@ -111,37 +305,78 @@ async function scanStock() {
                     🟢 Live Upstox Market Data
                 </p>
 
+                <p>
+                    <small>
+                        NSE • ${stock.symbol}
+                    </small>
+                </p>
+
             </div>
 
         `;
 
     } catch (error) {
 
-        console.error("SCAN ERROR:", error);
+        console.error(
+            "Scanner Error:",
+            error
+        );
 
-        result.innerHTML = `
-            <h2>❌ Unable to load market data</h2>
-            <p>${error.message}</p>
+        resultBox.innerHTML = `
+
+            <div class="status-card">
+
+                <h2>❌ Connection Error</h2>
+
+                <p>
+                    Unable to connect to server.
+                </p>
+
+            </div>
+
         `;
+
     }
 }
 
 
-// Press Enter to scan
-document.addEventListener("DOMContentLoaded", () => {
+// ==========================================
+// ENTER KEY SEARCH
+// ==========================================
 
-    const input = document.getElementById("search");
+searchInput.addEventListener(
+    "keydown",
+    function(event) {
 
-    if (input) {
+        if (event.key === "Enter") {
 
-        input.addEventListener("keydown", (event) => {
+            searchStock();
 
-            if (event.key === "Enter") {
-                scanStock();
-            }
-
-        });
+        }
 
     }
+);
 
-});
+
+// ==========================================
+// INITIAL LOAD
+// ==========================================
+
+window.addEventListener(
+    "load",
+    function() {
+
+        loadMarketStatus();
+
+    }
+);
+
+
+// ==========================================
+// AUTO UPDATE MARKET STATUS
+// ==========================================
+
+setInterval(
+    loadMarketStatus,
+    30000
+);
