@@ -1276,12 +1276,12 @@ async function getUpstoxQuote(
 }
 
 // ==========================================
-// V7.1 HISTORICAL CANDLES
+// V7.1 HISTORICAL CANDLES - UPSTOX V3
 // ==========================================
 
 async function getHistoricalCandles(
     instrument,
-    interval = "1minute"
+    interval = "1"
 ) {
 
     if (!instrument) {
@@ -1296,13 +1296,45 @@ async function getHistoricalCandles(
         throw error;
     }
 
+    // Today's date in India
+    const now = new Date();
+
+    const indiaDate =
+        new Date(
+            now.toLocaleString(
+                "en-US",
+                {
+                    timeZone: "Asia/Kolkata"
+                }
+            )
+        );
+
+    // YYYY-MM-DD
+    const toDate =
+        indiaDate
+            .toISOString()
+            .split("T")[0];
+
+    // 30 days back
+    const from =
+        new Date(indiaDate);
+
+    from.setDate(
+        from.getDate() - 30
+    );
+
+    const fromDate =
+        from
+            .toISOString()
+            .split("T")[0];
+
     const response =
         await upstoxRequest({
 
             method: "GET",
 
             url:
-                `/historical-candle/${encodeURIComponent(instrument)}/${interval}`
+                `/v3/historical-candle/${encodeURIComponent(instrument)}/minutes/${interval}/${toDate}/${fromDate}`
 
         });
 
@@ -1310,7 +1342,10 @@ async function getHistoricalCandles(
         response.data?.data?.candles ||
         [];
 
-    if (!Array.isArray(candles) || candles.length === 0) {
+    if (
+        !Array.isArray(candles) ||
+        candles.length === 0
+    ) {
 
         const error =
             new Error(
