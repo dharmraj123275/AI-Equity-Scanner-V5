@@ -2169,7 +2169,282 @@ app.get(
 
     }
 );
+// ==========================================
+// V7.1 TECHNICAL ANALYSIS
+// ==========================================
 
+app.get(
+    "/api/technical",
+    async (req, res) => {
+
+        try {
+
+            const instrument =
+                (
+                    req.query.instrument ||
+                    ""
+                ).trim();
+
+            if (!instrument) {
+
+                return res.status(400).json({
+
+                    success: false,
+
+                    message:
+                        "Instrument key is required"
+
+                });
+
+            }
+
+            // Get historical candles
+            const candles =
+                await getHistoricalCandles(
+                    instrument,
+                    "1minute"
+                );
+
+            // ----------------------------------
+            // Upstox candle format
+            // ----------------------------------
+            // [timestamp, open, high, low, close, volume, oi]
+
+            const formattedCandles =
+                candles.map(candle => ({
+
+                    timestamp:
+                        candle[0],
+
+                    open:
+                        Number(candle[1]),
+
+                    high:
+                        Number(candle[2]),
+
+                    low:
+                        Number(candle[3]),
+
+                    close:
+                        Number(candle[4]),
+
+                    volume:
+                        Number(candle[5] || 0),
+
+                    oi:
+                        Number(candle[6] || 0)
+
+                })).reverse();
+
+            if (
+                formattedCandles.length < 21
+            ) {
+
+                return res.status(400).json({
+
+                    success: false,
+
+                    message:
+                        "Not enough historical candles for technical analysis.",
+
+                    candles:
+                        formattedCandles.length
+
+                });
+
+            }
+
+            const closes =
+                formattedCandles.map(
+                    candle => candle.close
+                );
+
+            // ----------------------------------
+            // INDICATORS
+            // ----------------------------------
+
+            const ema9 =
+                technical.ema(
+                    closes,
+                    9
+                );
+
+            const ema21 =
+                technical.ema(
+                    closes,
+                    21
+                );
+
+            const rsi14 =
+                technical.rsi(
+                    closes,
+                    14
+                );
+
+            const vwapValue =
+                technical.vwap(
+                    formattedCandles
+                );
+
+            const atr14 =
+                technical.atr(
+                    formattedCandles,
+                    14
+                );
+
+            const avgVolume =
+                technical.averageVolume(
+                    formattedCandles,
+                    20
+                );
+
+            const current =
+                formattedCandles[
+                    formattedCandles.length - 1
+                ];
+
+            const currentPrice =
+                current.close;
+
+            const volumeRatio =
+                avgVolume > 0
+                    ? current.volume /
+                      avgVolume
+                    : 0;
+
+            // ----------------------------------
+            // TREND
+            // ----------------------------------
+
+            let trend =
+                "SIDEWAYS";
+
+            if (
+                ema9 &&
+                ema21 &&
+                ema9 > ema21 &&
+                currentPrice > vwapValue
+            ) {
+
+                trend =
+                    "BULLISH";
+
+            } else if (
+                ema9 &&
+                ema21 &&
+                ema9 < ema21 &&
+                currentPrice < vwapValue
+            ) {
+
+                trend =
+                    "BEARISH";
+
+            }
+
+            // ----------------------------------
+            // VOLUME
+            // ----------------------------------
+
+            const volumeConfirmed =
+                volumeRatio >= 1.5;
+
+            // ----------------------------------
+            // RSI
+            // ----------------------------------
+
+            let rsiSignal =
+                "NEUTRAL";
+
+            if (rsi14 >= 60) {
+
+                rsiSignal =
+                    "BULLISH";
+
+            } else if (rsi14 <= 40) {
+
+                rsiSignal =
+                    "BEARISH";
+
+            }
+
+            // ----------------------------------
+            // RESULT
+            // ----------------------------------
+
+            res.json({
+
+                success: true,
+
+                instrument,
+
+                candles:
+                    formattedCandles.length,
+
+                data: {
+
+                    price:
+                        currentPrice,
+
+                    ema9,
+
+                    ema21,
+
+                    rsi14,
+
+                    vwap:
+                        vwapValue,
+
+                    atr14,
+
+                    volume:
+                        current.volume,
+
+                    averageVolume:
+                        avgVolume,
+
+                    volumeRatio,
+
+                    volumeConfirmed,
+
+                    rsiSignal,
+
+                    trend
+
+                }
+
+            });
+
+        } catch (error) {
+
+            console.error(
+                "TECHNICAL ERROR:",
+                error.response?.data ||
+                error.message
+            );
+
+            const status =
+                error.statusCode ||
+                error.response?.status ||
+                500;
+
+            res.status(status).json({
+
+                success: false,
+
+                message:
+                    error.message ||
+                    "Technical analysis failed",
+
+                error:
+                    error.response?.data ||
+                    error.message
+
+            });
+
+        }
+
+    }
+);
 
 // ============================================================
 // UPSTOX INSTRUMENT SEARCH
