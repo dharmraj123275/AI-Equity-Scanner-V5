@@ -34,6 +34,7 @@ const cors = require("cors");
 const path = require("path");
 const axios = require("axios");
 const fs = require("fs");
+const technical = require("./technical.js");
 
 const app = express();
 
