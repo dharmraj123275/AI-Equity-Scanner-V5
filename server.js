@@ -2329,11 +2329,12 @@ riskReward =
     ),
 
         riskRewardTarget2:
-            round2(
-                signal === "SELL"
-                    ? sellRR2
-                    : buyRR2
-            ),
+    round2(
+        signal === "SELL" ||
+        signal === "STRONG SELL"
+            ? sellRR2
+            : buyRR2
+    ),
 
         marketDepth: {
 
