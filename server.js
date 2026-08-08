@@ -1275,6 +1275,55 @@ async function getUpstoxQuote(
 
 }
 
+// ==========================================
+// V7.1 HISTORICAL CANDLES
+// ==========================================
+
+async function getHistoricalCandles(
+    instrument,
+    interval = "1minute"
+) {
+
+    if (!instrument) {
+
+        const error =
+            new Error(
+                "Instrument key is required for historical candles."
+            );
+
+        error.statusCode = 400;
+
+        throw error;
+    }
+
+    const response =
+        await upstoxRequest({
+
+            method: "GET",
+
+            url:
+                `/historical-candle/${encodeURIComponent(instrument)}/${interval}`
+
+        });
+
+    const candles =
+        response.data?.data?.candles ||
+        [];
+
+    if (!Array.isArray(candles) || candles.length === 0) {
+
+        const error =
+            new Error(
+                "Upstox returned no historical candle data."
+            );
+
+        error.statusCode = 404;
+
+        throw error;
+    }
+
+    return candles;
+}
 
 // ==========================================
 // AI EQUITY SCANNER PRO V7
