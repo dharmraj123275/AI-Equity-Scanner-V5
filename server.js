@@ -2045,32 +2045,77 @@ function buildAnalysis(quote) {
     }
 
     // ==========================================
-    // SELECT TRADE LEVELS
-    // ==========================================
+// SELECT TRADE LEVELS - V7.1
+// ==========================================
 
-    let entry =
-        price;
+let entry = price;
+let target1 = price;
+let target2 = price;
+let stopLoss = price;
+let riskReward = 0;
 
-    let target1 =
-        price;
+// ------------------------------------------
+// ACTIVE BUY SIGNALS
+// ------------------------------------------
 
-    let target2 =
-        price;
+if (
+    signal === "BUY" ||
+    signal === "STRONG BUY" ||
+    signal === "BREAKOUT BUY"
+) {
 
-    let stopLoss =
-        price;
+    entry = buyEntry;
 
-    let riskReward =
-        0;
+    target1 = buyTarget1;
 
-    if (
-        signal === "BUY" ||
-        signal === "STRONG BUY" ||
-        signal === "BREAKOUT BUY"
-    ) {
+    target2 = buyTarget2;
+
+    stopLoss = buyStop;
+
+    riskReward = buyRR1;
+
+}
+
+// ------------------------------------------
+// SELL SIGNAL
+// ------------------------------------------
+
+else if (
+    signal === "SELL"
+) {
+
+    entry = sellEntry;
+
+    target1 = sellTarget1;
+
+    target2 = sellTarget2;
+
+    stopLoss = sellStop;
+
+    riskReward = sellRR1;
+
+}
+
+// ------------------------------------------
+// WAIT
+// ------------------------------------------
+// WAITમાં પણ useful trading levels બતાવો.
+// Signal WAIT રહેશે, પરંતુ levels zero/price-price નહીં રહે.
+
+else if (
+    signal === "WAIT"
+) {
+
+    if (bullish) {
 
         entry =
-            buyEntry;
+            Math.min(
+                price,
+                resistance
+            );
+
+        stopLoss =
+            buyStop;
 
         target1 =
             buyTarget1;
@@ -2078,18 +2123,18 @@ function buildAnalysis(quote) {
         target2 =
             buyTarget2;
 
-        stopLoss =
-            buyStop;
-
         riskReward =
             buyRR1;
 
-    } else if (
-        signal === "SELL"
-    ) {
+    }
+
+    else if (bearish) {
 
         entry =
             sellEntry;
+
+        stopLoss =
+            sellStop;
 
         target1 =
             sellTarget1;
@@ -2097,13 +2142,87 @@ function buildAnalysis(quote) {
         target2 =
             sellTarget2;
 
-        stopLoss =
-            sellStop;
-
         riskReward =
             sellRR1;
 
     }
+
+    else {
+
+        // SIDEWAYS → levels based on range
+
+        entry =
+            price;
+
+        stopLoss =
+            Math.max(
+                0,
+                price - riskDistance
+            );
+
+        target1 =
+            price + riskDistance;
+
+        target2 =
+            price + (riskDistance * 1.5);
+
+        riskReward =
+            1;
+
+    }
+
+}
+
+// ------------------------------------------
+// AVOID
+// ------------------------------------------
+
+else if (
+    signal === "AVOID"
+) {
+
+    entry = price;
+
+    target1 = price;
+
+    target2 = price;
+
+    stopLoss = price;
+
+    riskReward = 0;
+
+}
+
+// ------------------------------------------
+// SAFETY ROUNDING
+// ------------------------------------------
+
+entry =
+    Number(entry) > 0
+        ? entry
+        : price;
+
+target1 =
+    Number(target1) > 0
+        ? target1
+        : price;
+
+target2 =
+    Number(target2) > 0
+        ? target2
+        : price;
+
+stopLoss =
+    Number(stopLoss) > 0
+        ? stopLoss
+        : price;
+
+riskReward =
+    Number.isFinite(
+        Number(riskReward)
+    )
+        ? Number(riskReward)
+        : 0;
 
     // ==========================================
     // TRADE QUALITY
