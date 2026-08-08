@@ -1281,7 +1281,7 @@ async function getUpstoxQuote(
 
 async function getHistoricalCandles(
     instrument,
-    interval = "1"
+    interval = "1minute"
 ) {
 
     if (!instrument) {
@@ -1306,66 +1306,120 @@ async function getHistoricalCandles(
                 "UPSTOX_ACCESS_TOKEN is missing."
             );
 
-        error.statusCode = 401;
+        error.statusCode = 500;
 
         throw error;
     }
 
-    // ------------------------------------------
-    // INDIA DATE
-    // ------------------------------------------
+    // --------------------------------------
+    // DATE
+    // --------------------------------------
 
     const now = new Date();
 
-    const indiaString =
-        now.toLocaleString(
-            "en-US",
-            {
-                timeZone: "Asia/Kolkata"
-            }
+    const indiaNow =
+        new Date(
+            now.toLocaleString(
+                "en-US",
+                {
+                    timeZone:
+                        "Asia/Kolkata"
+                }
+            )
         );
 
-    const indiaDate =
-        new Date(indiaString);
-
-    // YYYY-MM-DD
-    function formatDate(date) {
-
-        return date
+    // Today's date
+    const toDate =
+        indiaNow
             .toISOString()
             .split("T")[0];
 
-    }
+    // 7 days back
+    const fromDateObj =
+        new Date(indiaNow);
 
-    const toDate =
-        formatDate(indiaDate);
-
-    // 30 days back
-    const from =
-        new Date(indiaDate);
-
-    from.setDate(
-        from.getDate() - 30
+    fromDateObj.setDate(
+        fromDateObj.getDate() - 7
     );
 
     const fromDate =
-        formatDate(from);
+        fromDateObj
+            .toISOString()
+            .split("T")[0];
 
-    // ------------------------------------------
+    // --------------------------------------
+    // V3 INTERVAL CONVERSION
+    // --------------------------------------
+
+    let unit = "minutes";
+    let intervalValue = "1";
+
+    if (
+        interval === "1minute"
+    ) {
+
+        unit = "minutes";
+        intervalValue = "1";
+
+    } else if (
+        interval === "5minute"
+    ) {
+
+        unit = "minutes";
+        intervalValue = "5";
+
+    } else if (
+        interval === "15minute"
+    ) {
+
+        unit = "minutes";
+        intervalValue = "15";
+
+    } else if (
+        interval === "30minute"
+    ) {
+
+        unit = "minutes";
+        intervalValue = "30";
+
+    } else if (
+        interval === "day"
+    ) {
+
+        unit = "days";
+        intervalValue = "1";
+
+    }
+
+    // --------------------------------------
+    // ENCODE INSTRUMENT KEY
+    // --------------------------------------
+
+    const encodedInstrument =
+        encodeURIComponent(
+            instrument
+        );
+
+    // --------------------------------------
     // UPSTOX V3 URL
-    // ------------------------------------------
+    // --------------------------------------
 
     const url =
         `https://api.upstox.com/v3/historical-candle/` +
-        `${encodeURIComponent(instrument)}/` +
-        `minutes/${interval}/` +
+        `${encodedInstrument}/` +
+        `${unit}/` +
+        `${intervalValue}/` +
         `${toDate}/` +
         `${fromDate}`;
 
     console.log(
-        "Historical V3 URL:",
+        "HISTORICAL URL:",
         url
     );
+
+    // --------------------------------------
+    // REQUEST
+    // --------------------------------------
 
     try {
 
@@ -1398,7 +1452,7 @@ async function getHistoricalCandles(
 
             const error =
                 new Error(
-                    "Upstox returned no historical candle data."
+                    "Upstox returned no historical candles."
                 );
 
             error.statusCode = 404;
@@ -1415,27 +1469,40 @@ async function getHistoricalCandles(
     } catch (error) {
 
         console.error(
-            "HISTORICAL V3 ERROR:",
+            "HISTORICAL CANDLE ERROR:",
             error.response?.data ||
             error.message
         );
 
-        const status =
-            error.response?.status ||
-            error.statusCode ||
-            500;
+        if (
+            error.response?.status === 401
+        ) {
 
-        const newError =
-            new Error(
-                error.response?.data?.errors?.[0]?.message ||
-                error.message ||
-                "Historical candle request failed."
-            );
+            const authError =
+                new Error(
+                    "Upstox access token is invalid or expired."
+                );
 
-        newError.statusCode =
-            status;
+            authError.statusCode = 401;
 
-        throw newError;
+            throw authError;
+        }
+
+        if (
+            error.response?.status === 404
+        ) {
+
+            const notFound =
+                new Error(
+                    "Upstox historical candle resource not found. Check instrument key and V3 endpoint."
+                );
+
+            notFound.statusCode = 404;
+
+            throw notFound;
+        }
+
+        throw error;
     }
 }
 
