@@ -1,97 +1,70 @@
 {
   "version": "1.0",
-  "description": "AI Equity Scanner Pro fallback stock and index aliases",
+  "description": "AI Equity Scanner Pro Upstox instrument aliases",
   "aliases": [
     {
       "symbol": "RELIANCE",
       "name": "Reliance Industries",
       "search": "RELIANCE",
       "exchange": "NSE",
-      "segment": "EQ"
+      "segment": "EQ",
+      "instrument": "NSE_EQ|INE002A01018"
     },
     {
       "symbol": "TCS",
       "name": "Tata Consultancy Services",
       "search": "TCS",
       "exchange": "NSE",
-      "segment": "EQ"
+      "segment": "EQ",
+      "instrument": "NSE_EQ|INE467B01029"
     },
     {
       "symbol": "INFY",
       "name": "Infosys",
       "search": "INFY",
       "exchange": "NSE",
-      "segment": "EQ"
+      "segment": "EQ",
+      "instrument": "NSE_EQ|INE009A01021"
     },
     {
       "symbol": "SBIN",
       "name": "State Bank of India",
       "search": "SBIN",
       "exchange": "NSE",
-      "segment": "EQ"
+      "segment": "EQ",
+      "instrument": "NSE_EQ|INE062A01020"
     },
     {
       "symbol": "HDFCBANK",
       "name": "HDFC Bank",
       "search": "HDFCBANK",
       "exchange": "NSE",
-      "segment": "EQ"
+      "segment": "EQ",
+      "instrument": "NSE_EQ|INE040A01034"
     },
     {
       "symbol": "ICICIBANK",
       "name": "ICICI Bank",
       "search": "ICICIBANK",
       "exchange": "NSE",
-      "segment": "EQ"
+      "segment": "EQ",
+      "instrument": "NSE_EQ|INE090A01021"
     },
     {
       "symbol": "ITC",
       "name": "ITC",
       "search": "ITC",
       "exchange": "NSE",
-      "segment": "EQ"
+      "segment": "EQ",
+      "instrument": "NSE_EQ|INE154A01025"
     },
     {
       "symbol": "LT",
       "name": "Larsen & Toubro",
       "search": "LT",
       "exchange": "NSE",
-      "segment": "EQ"
-    },
-    {
-      "symbol": "NIFTY50",
-      "name": "Nifty 50",
-      "search": "Nifty 50",
-      "exchange": "NSE",
-      "segment": "INDEX"
-    },
-    {
-      "symbol": "BANKNIFTY",
-      "name": "Nifty Bank",
-      "search": "Nifty Bank",
-      "exchange": "NSE",
-      "segment": "INDEX"
-    },
-    {
-      "symbol": "FINNIFTY",
-      "name": "Nifty Financial Services",
-      "search": "Nifty Financial Services",
-      "exchange": "NSE",
-      "segment": "INDEX"
-    },
-    {
-      "symbol": "MIDCPNIFTY",
-      "name": "Nifty Midcap Select",
-      "search": "Nifty Midcap Select",
-      "exchange": "NSE",
-      "segment": "INDEX"
-    },
-    {
-      "symbol": "INDIAVIX",
-      "name": "India VIX",
-      "search": "India VIX",
-      "exchange": "NSE",
-      "segment": "INDEX"
+      "segment": "EQ",
+      "instrument": "NSE_EQ|INE018A01030"
     }
   ]
 }
