@@ -1,57 +1,81 @@
 // ==========================================
 // AI EQUITY SCANNER PRO V5
 // COMPLETE APP.JS
-// LIVE UPSTOX STOCK ANALYSIS
+// SEARCH + LIVE QUOTE + AI ANALYSIS
 // ==========================================
 
-const searchInput = document.getElementById("search");
-const result = document.getElementById("result");
+let selectedInstrument = "";
+let selectedStock = "";
+
+// ==========================================
+// API BASE
+// ==========================================
+
+const API_BASE = "";
+
+// ==========================================
+// PAGE LOAD
+// ==========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    loadMarketStatus();
+
+    setInterval(loadMarketStatus, 30000);
+
+});
 
 // ==========================================
 // MARKET STATUS
 // ==========================================
 
 async function loadMarketStatus() {
+
+    const marketStatus =
+        document.getElementById("marketStatus");
+
+    const lastUpdate =
+        document.getElementById("lastUpdate");
+
     try {
-        const response = await fetch("/api/status");
-        const data = await response.json();
 
-        const marketStatus =
-            document.getElementById("marketStatus");
+        const response =
+            await fetch(
+                `${API_BASE}/api/status`
+            );
 
-        const lastUpdate =
-            document.getElementById("lastUpdate");
+        const data =
+            await response.json();
 
-        if (marketStatus) {
-            marketStatus.innerText =
-                data.market || "Market Status Unknown";
+        if (!data.success) {
+
+            marketStatus.textContent =
+                "⚠ Market status unavailable";
+
+            return;
         }
 
-        if (lastUpdate) {
-            lastUpdate.innerText =
-                `${data.date || ""} • ${data.time || ""}`;
-        }
+        marketStatus.textContent =
+            data.market || "Unknown";
+
+        lastUpdate.textContent =
+            `${data.date || ""} ${data.time || ""}`;
 
     } catch (error) {
 
-        console.error("Market Status Error:", error);
+        console.error(
+            "MARKET STATUS ERROR:",
+            error
+        );
 
-        const marketStatus =
-            document.getElementById("marketStatus");
+        marketStatus.textContent =
+            "⚠ Server unavailable";
 
-        const lastUpdate =
-            document.getElementById("lastUpdate");
+        lastUpdate.textContent =
+            "Unable to connect to backend";
 
-        if (marketStatus) {
-            marketStatus.innerText =
-                "⚠ Server Connection Error";
-        }
-
-        if (lastUpdate) {
-            lastUpdate.innerText =
-                "Unable to connect";
-        }
     }
+
 }
 
 // ==========================================
@@ -60,21 +84,20 @@ async function loadMarketStatus() {
 
 async function searchStock() {
 
+    const input =
+        document.getElementById("search");
+
+    const result =
+        document.getElementById("result");
+
     const query =
-        searchInput.value.trim();
+        input.value.trim();
 
     if (!query) {
 
         result.innerHTML = `
-            <div class="status-card">
-
-                <h2>⚠ Enter Stock Name</h2>
-
-                <p>
-                    Example:
-                    Reliance, TCS, SBI, Infosys
-                </p>
-
+            <div class="error-card">
+                ⚠ Please enter a stock name or symbol.
             </div>
         `;
 
@@ -82,419 +105,828 @@ async function searchStock() {
     }
 
     result.innerHTML = `
-        <div class="status-card">
-
-            <h2>🔎 Searching...</h2>
-
-            <p>
-                Finding ${escapeHtml(query)}
-            </p>
-
+        <div class="loading-card">
+            🔎 Searching <b>${escapeHtml(query)}</b>...
         </div>
     `;
 
     try {
 
-        // ======================================
-        // STEP 1 — STOCK SEARCH
-        // ======================================
-
-        const searchResponse =
+        const response =
             await fetch(
-                "/api/search?q=" +
-                encodeURIComponent(query)
+                `${API_BASE}/api/search?q=${encodeURIComponent(query)}`
             );
 
-        const searchData =
-            await searchResponse.json();
+        const data =
+            await response.json();
 
         console.log(
             "SEARCH RESPONSE:",
-            searchData
+            data
         );
 
-        if (
-            !searchData.success ||
-            !searchData.results ||
-            searchData.results.length === 0
-        ) {
+        if (!response.ok || !data.success) {
 
             result.innerHTML = `
-                <div class="status-card">
-
-                    <h2>❌ Stock Not Found</h2>
-
-                    <p>
-                        No stock found for
-                        "${escapeHtml(query)}"
-                    </p>
-
-                    <small>
-                        Try RELIANCE, TCS, SBIN,
-                        INFY, HDFCBANK
-                    </small>
-
+                <div class="error-card">
+                    ❌ ${escapeHtml(
+                        data.message ||
+                        "Stock search failed"
+                    )}
                 </div>
             `;
 
             return;
         }
 
-        // First matching stock
-        const stock =
-            searchData.results[0];
+        const results =
+            Array.isArray(data.results)
+                ? data.results
+                : [];
 
-        // ======================================
-        // STEP 2 — LIVE UPSTOX DATA
-        // ======================================
-
-        result.innerHTML = `
-            <div class="status-card">
-
-                <h2>📡 Connecting to Upstox...</h2>
-
-                <p>
-                    Loading live data for
-                    <b>${escapeHtml(stock.name)}</b>
-                </p>
-
-            </div>
-        `;
-
-        const liveResponse =
-            await fetch(
-                "/api/live?instrument=" +
-                encodeURIComponent(
-                    stock.instrument
-                )
-            );
-
-        const liveData =
-            await liveResponse.json();
-
-        console.log(
-            "LIVE RESPONSE:",
-            liveData
-        );
-
-        if (!liveData.success) {
+        if (results.length === 0) {
 
             result.innerHTML = `
-                <div class="status-card">
-
-                    <h2>⚠ Live Data Error</h2>
-
-                    <p>
-                        ${
-                            escapeHtml(
-                                liveData.message ||
-                                "Unable to fetch live data"
-                            )
-                        }
-                    </p>
-
-                    <small>
-                        Upstox API response unavailable.
-                    </small>
-
+                <div class="error-card">
+                    ❌ No stock found for
+                    <b>${escapeHtml(query)}</b>
                 </div>
             `;
 
             return;
         }
 
-        // ======================================
-        // STEP 3 — ANALYSIS DATA
-        // ======================================
-
-        const data =
-            liveData.data || {};
-
-        const price =
-            Number(data.price || 0);
-
-        const netChange =
-            Number(data.netChange || 0);
-
-        const changePercent =
-            Number(data.changePercent || 0);
-
-        const open =
-            Number(data.open || 0);
-
-        const high =
-            Number(data.high || 0);
-
-        const low =
-            Number(data.low || 0);
-
-        const close =
-            Number(data.close || 0);
-
-        const volume =
-            Number(data.volume || 0);
-
-        const oi =
-            Number(data.oi || 0);
-
-        const support =
-            Number(data.support || 0);
-
-        const resistance =
-            Number(data.resistance || 0);
-
-        const aiScore =
-            Number(data.aiScore || 0);
-
-        const entry =
-            Number(data.entry || 0);
-
-        const target1 =
-            Number(data.target1 || 0);
-
-        const target2 =
-            Number(data.target2 || 0);
-
-        const stopLoss =
-            Number(data.stopLoss || 0);
-
-        const riskReward =
-            Number(data.riskReward || 0);
-
-        const trend =
-            data.trend || "SIDEWAYS";
-
-        const signal =
-            data.signal || "HOLD";
-
-        const buyQuantity =
-            Number(
-                data.marketDepth?.buyQuantity || 0
-            );
-
-        const sellQuantity =
-            Number(
-                data.marketDepth?.sellQuantity || 0
-            );
-
-        // ======================================
-        // SIGNAL DISPLAY
-        // ======================================
-
-        let signalIcon = "🟡";
-
-        if (signal === "BUY") {
-            signalIcon = "🟢";
-        }
-
-        if (signal === "SELL") {
-            signalIcon = "🔴";
-        }
-
-        // ======================================
-        // TREND DISPLAY
-        // ======================================
-
-        let trendIcon = "🟡";
-
-        if (trend === "BULLISH") {
-            trendIcon = "🟢";
-        }
-
-        if (trend === "BEARISH") {
-            trendIcon = "🔴";
-        }
-
-        // ======================================
-        // CHANGE DISPLAY
-        // ======================================
-
-        const changeIcon =
-            netChange >= 0
-                ? "▲"
-                : "▼";
-
-        // ======================================
-        // FINAL DISPLAY
-        // ======================================
-
-        result.innerHTML = `
-
-            <div class="status-card">
-
-                <h2>
-                    📊 ${escapeHtml(stock.name)}
-                </h2>
-
-                <p>
-                    <b>
-                        ${escapeHtml(stock.exchange)}
-                        •
-                        ${escapeHtml(stock.symbol)}
-                    </b>
-                </p>
-
-                <hr>
-
-                <h1>
-                    ₹${formatPrice(price)}
-                </h1>
-
-                <h3>
-                    ${changeIcon}
-                    ${formatPrice(netChange)}
-                    (${formatPrice(changePercent)}%)
-                </h3>
-
-                <hr>
-
-                <h2>
-                    ${signalIcon}
-                    Signal:
-                    <b>${escapeHtml(signal)}</b>
-                </h2>
-
-                <p>
-                    ${trendIcon}
-                    Trend:
-                    <b>${escapeHtml(trend)}</b>
-                </p>
-
-                <p>
-                    🤖 AI Score:
-                    <b>${formatNumber(aiScore)}/100</b>
-                </p>
-
-                <hr>
-
-                <h3>🎯 Trading Levels</h3>
-
-                <p>
-                    <b>Entry:</b>
-                    ₹${formatPrice(entry)}
-                </p>
-
-                <p>
-                    <b>Target 1:</b>
-                    ₹${formatPrice(target1)}
-                </p>
-
-                <p>
-                    <b>Target 2:</b>
-                    ₹${formatPrice(target2)}
-                </p>
-
-                <p>
-                    <b>Stop Loss:</b>
-                    ₹${formatPrice(stopLoss)}
-                </p>
-
-                <p>
-                    <b>Risk / Reward:</b>
-                    1 : ${formatPrice(riskReward)}
-                </p>
-
-                <hr>
-
-                <h3>📈 Technical Data</h3>
-
-                <p>
-                    <b>Open:</b>
-                    ₹${formatPrice(open)}
-                </p>
-
-                <p>
-                    <b>High:</b>
-                    ₹${formatPrice(high)}
-                </p>
-
-                <p>
-                    <b>Low:</b>
-                    ₹${formatPrice(low)}
-                </p>
-
-                <p>
-                    <b>Previous Close:</b>
-                    ₹${formatPrice(close)}
-                </p>
-
-                <p>
-                    <b>Support:</b>
-                    ₹${formatPrice(support)}
-                </p>
-
-                <p>
-                    <b>Resistance:</b>
-                    ₹${formatPrice(resistance)}
-                </p>
-
-                <hr>
-
-                <h3>📊 Market Data</h3>
-
-                <p>
-                    <b>Volume:</b>
-                    ${formatNumber(volume)}
-                </p>
-
-                <p>
-                    <b>OI:</b>
-                    ${formatNumber(oi)}
-                </p>
-
-                <hr>
-
-                <h3>📦 Market Depth</h3>
-
-                <p>
-                    🟢 Buy Quantity:
-                    <b>${formatNumber(buyQuantity)}</b>
-                </p>
-
-                <p>
-                    🔴 Sell Quantity:
-                    <b>${formatNumber(sellQuantity)}</b>
-                </p>
-
-                <hr>
-
-                <p>
-                    🟢 Live Upstox Market Data
-                </p>
-
-                <small>
-                    Instrument:
-                    ${escapeHtml(stock.instrument)}
-                </small>
-
-            </div>
-        `;
+        displaySearchResults(results);
 
     } catch (error) {
 
         console.error(
-            "Scanner Error:",
+            "SEARCH ERROR:",
+            error
+        );
+
+        result.innerHTML = `
+            <div class="error-card">
+                ❌ Unable to connect to scanner server.
+            </div>
+        `;
+
+    }
+
+}
+
+// ==========================================
+// DISPLAY SEARCH RESULTS
+// ==========================================
+
+function displaySearchResults(results) {
+
+    const result =
+        document.getElementById("result");
+
+    let html = `
+        <div class="search-results">
+
+            <h3>🔎 Search Results</h3>
+    `;
+
+    results.forEach((stock, index) => {
+
+        const instrument =
+            stock.instrument ||
+            stock.instrument_key ||
+            "";
+
+        const symbol =
+            stock.symbol ||
+            stock.trading_symbol ||
+            "";
+
+        const name =
+            stock.name ||
+            symbol ||
+            "Unknown";
+
+        const exchange =
+            stock.exchange ||
+            "";
+
+        const segment =
+            stock.segment ||
+            "";
+
+        html += `
+
+            <div
+                class="stock-result"
+                onclick="selectStock(
+                    '${escapeAttribute(instrument)}',
+                    '${escapeAttribute(symbol)}',
+                    '${escapeAttribute(name)}'
+                )"
+            >
+
+                <div>
+
+                    <strong>
+                        ${escapeHtml(symbol)}
+                    </strong>
+
+                    <br>
+
+                    <span>
+                        ${escapeHtml(name)}
+                    </span>
+
+                </div>
+
+                <div class="stock-meta">
+
+                    ${escapeHtml(exchange)}
+
+                    ${segment
+                        ? " • " + escapeHtml(segment)
+                        : ""
+                    }
+
+                </div>
+
+            </div>
+
+        `;
+
+    });
+
+    html += `
+        </div>
+    `;
+
+    result.innerHTML = html;
+
+}
+
+// ==========================================
+// SELECT STOCK
+// ==========================================
+
+function selectStock(
+    instrument,
+    symbol,
+    name
+) {
+
+    console.log(
+        "SELECTED STOCK:",
+        {
+            instrument,
+            symbol,
+            name
+        }
+    );
+
+    selectedInstrument =
+        instrument;
+
+    selectedStock =
+        symbol;
+
+    const result =
+        document.getElementById("result");
+
+    // ======================================
+    // IMPORTANT
+    // ======================================
+
+    if (!selectedInstrument) {
+
+        result.innerHTML = `
+
+            <div class="error-card">
+
+                ⚠ <b>${escapeHtml(symbol)}</b>
+                selected.
+
+                <br><br>
+
+                But this search result does not contain
+                an Upstox instrument key.
+
+                <br><br>
+
+                Please make sure Upstox search is working
+                and try again.
+
+            </div>
+
+        `;
+
+        return;
+    }
+
+    // ======================================
+    // SHOW LOADING
+    // ======================================
+
+    result.innerHTML = `
+
+        <div class="loading-card">
+
+            📡 Connecting to Upstox...
+
+            <br><br>
+
+            <b>${escapeHtml(symbol)}</b>
+
+        </div>
+
+    `;
+
+    // ======================================
+    // LOAD LIVE DATA
+    // ======================================
+
+    loadLiveData(
+        selectedInstrument,
+        symbol,
+        name
+    );
+
+}
+
+// ==========================================
+// LIVE DATA
+// ==========================================
+
+async function loadLiveData(
+    instrument,
+    symbol = "",
+    name = ""
+) {
+
+    const result =
+        document.getElementById("result");
+
+    if (!instrument) {
+
+        result.innerHTML = `
+
+            <div class="error-card">
+
+                ⚠ Instrument key is required.
+
+                <br><br>
+
+                Please search and select the stock again.
+
+            </div>
+
+        `;
+
+        return;
+    }
+
+    result.innerHTML = `
+
+        <div class="loading-card">
+
+            📡 Loading live market data...
+
+            <br><br>
+
+            <small>
+                ${escapeHtml(symbol)}
+            </small>
+
+        </div>
+
+    `;
+
+    try {
+
+        const url =
+            `${API_BASE}/api/live?instrument=${encodeURIComponent(
+                instrument
+            )}`;
+
+        console.log(
+            "LIVE API:",
+            url
+        );
+
+        const response =
+            await fetch(url);
+
+        const data =
+            await response.json();
+
+        console.log(
+            "LIVE RESPONSE:",
+            data
+        );
+
+        if (!response.ok || !data.success) {
+
+            result.innerHTML = `
+
+                <div class="error-card">
+
+                    ⚠ <b>Live Data Error</b>
+
+                    <br><br>
+
+                    ${escapeHtml(
+                        data.message ||
+                        "Upstox API response unavailable."
+                    )}
+
+                    <br><br>
+
+                    <small>
+                        Instrument:
+                        ${escapeHtml(instrument)}
+                    </small>
+
+                </div>
+
+            `;
+
+            return;
+        }
+
+        const analysis =
+            data.data || {};
+
+        displayAnalysis(
+            analysis,
+            symbol,
+            name
+        );
+
+    } catch (error) {
+
+        console.error(
+            "LIVE DATA ERROR:",
             error
         );
 
         result.innerHTML = `
 
-            <div class="status-card">
+            <div class="error-card">
 
-                <h2>⚠ Connection Error</h2>
+                ⚠ <b>Live Data Error</b>
 
-                <p>
-                    Unable to connect to server.
-                </p>
+                <br><br>
+
+                Unable to connect to backend.
+
+                <br><br>
 
                 <small>
-                    ${escapeHtml(error.message)}
+                    ${escapeHtml(
+                        error.message
+                    )}
                 </small>
 
             </div>
 
         `;
+
     }
+
+}
+
+// ==========================================
+// DISPLAY ANALYSIS
+// ==========================================
+
+function displayAnalysis(
+    data,
+    symbol,
+    name
+) {
+
+    const result =
+        document.getElementById("result");
+
+    const price =
+        number(data.price);
+
+    const change =
+        number(data.netChange);
+
+    const changePercent =
+        number(data.changePercent);
+
+    const open =
+        number(data.open);
+
+    const high =
+        number(data.high);
+
+    const low =
+        number(data.low);
+
+    const close =
+        number(data.close);
+
+    const volume =
+        number(data.volume);
+
+    const oi =
+        number(data.oi);
+
+    const support =
+        number(data.support);
+
+    const resistance =
+        number(data.resistance);
+
+    const aiScore =
+        number(data.aiScore);
+
+    const entry =
+        number(data.entry);
+
+    const target1 =
+        number(data.target1);
+
+    const target2 =
+        number(data.target2);
+
+    const stopLoss =
+        number(data.stopLoss);
+
+    const riskReward =
+        number(data.riskReward);
+
+    const trend =
+        data.trend ||
+        "SIDEWAYS";
+
+    const signal =
+        data.signal ||
+        "HOLD";
+
+    const buyQuantity =
+        number(
+            data.marketDepth?.buyQuantity
+        );
+
+    const sellQuantity =
+        number(
+            data.marketDepth?.sellQuantity
+        );
+
+    // ======================================
+    // SIGNAL CLASS
+    // ======================================
+
+    let signalClass =
+        "hold";
+
+    if (signal === "BUY") {
+        signalClass = "buy";
+    }
+
+    if (signal === "SELL") {
+        signalClass = "sell";
+    }
+
+    // ======================================
+    // CHANGE CLASS
+    // ======================================
+
+    const changeClass =
+        change > 0
+            ? "positive"
+            : change < 0
+                ? "negative"
+                : "neutral";
+
+    // ======================================
+    // HTML
+    // ======================================
+
+    result.innerHTML = `
+
+        <div class="analysis-card">
+
+            <div class="analysis-header">
+
+                <div>
+
+                    <h2>
+                        📈 ${escapeHtml(
+                            symbol || "Stock"
+                        )}
+                    </h2>
+
+                    <p>
+                        ${escapeHtml(
+                            name || ""
+                        )}
+                    </p>
+
+                </div>
+
+                <div class="signal ${signalClass}">
+
+                    ${signal}
+
+                </div>
+
+            </div>
+
+            <div class="price-section">
+
+                <div class="price">
+
+                    ₹${formatPrice(price)}
+
+                </div>
+
+                <div class="${changeClass}">
+
+                    ${change >= 0 ? "+" : ""}
+                    ${formatPrice(change)}
+
+                    (${changePercent >= 0 ? "+" : ""}
+                    ${changePercent.toFixed(2)}%)
+
+                </div>
+
+            </div>
+
+            <div class="metrics">
+
+                <div class="metric">
+
+                    <span>Trend</span>
+
+                    <strong>
+                        ${escapeHtml(trend)}
+                    </strong>
+
+                </div>
+
+                <div class="metric">
+
+                    <span>AI Score</span>
+
+                    <strong>
+                        ${aiScore}/100
+                    </strong>
+
+                </div>
+
+                <div class="metric">
+
+                    <span>Open</span>
+
+                    <strong>
+                        ₹${formatPrice(open)}
+                    </strong>
+
+                </div>
+
+                <div class="metric">
+
+                    <span>High</span>
+
+                    <strong>
+                        ₹${formatPrice(high)}
+                    </strong>
+
+                </div>
+
+                <div class="metric">
+
+                    <span>Low</span>
+
+                    <strong>
+                        ₹${formatPrice(low)}
+                    </strong>
+
+                </div>
+
+                <div class="metric">
+
+                    <span>Previous Close</span>
+
+                    <strong>
+                        ₹${formatPrice(close)}
+                    </strong>
+
+                </div>
+
+                <div class="metric">
+
+                    <span>Volume</span>
+
+                    <strong>
+                        ${formatNumber(volume)}
+                    </strong>
+
+                </div>
+
+                <div class="metric">
+
+                    <span>OI</span>
+
+                    <strong>
+                        ${formatNumber(oi)}
+                    </strong>
+
+                </div>
+
+            </div>
+
+            <h3>
+                🎯 Trade Levels
+            </h3>
+
+            <div class="trade-levels">
+
+                <div class="trade-box">
+
+                    <span>Entry</span>
+
+                    <strong>
+                        ₹${formatPrice(entry)}
+                    </strong>
+
+                </div>
+
+                <div class="trade-box">
+
+                    <span>Target 1</span>
+
+                    <strong>
+                        ₹${formatPrice(target1)}
+                    </strong>
+
+                </div>
+
+                <div class="trade-box">
+
+                    <span>Target 2</span>
+
+                    <strong>
+                        ₹${formatPrice(target2)}
+                    </strong>
+
+                </div>
+
+                <div class="trade-box">
+
+                    <span>Stop Loss</span>
+
+                    <strong>
+                        ₹${formatPrice(stopLoss)}
+                    </strong>
+
+                </div>
+
+                <div class="trade-box">
+
+                    <span>Risk / Reward</span>
+
+                    <strong>
+                        1 : ${riskReward.toFixed(2)}
+                    </strong>
+
+                </div>
+
+            </div>
+
+            <h3>
+                📊 Support / Resistance
+            </h3>
+
+            <div class="levels">
+
+                <div>
+
+                    <span>Support</span>
+
+                    <strong>
+                        ₹${formatPrice(support)}
+                    </strong>
+
+                </div>
+
+                <div>
+
+                    <span>Resistance</span>
+
+                    <strong>
+                        ₹${formatPrice(resistance)}
+                    </strong>
+
+                </div>
+
+            </div>
+
+            <h3>
+                📚 Market Depth
+            </h3>
+
+            <div class="depth">
+
+                <div>
+
+                    <span>Buy Quantity</span>
+
+                    <strong>
+                        ${formatNumber(
+                            buyQuantity
+                        )}
+                    </strong>
+
+                </div>
+
+                <div>
+
+                    <span>Sell Quantity</span>
+
+                    <strong>
+                        ${formatNumber(
+                            sellQuantity
+                        )}
+                    </strong>
+
+                </div>
+
+            </div>
+
+            <button
+                class="refresh-button"
+                onclick="loadLiveData(
+                    '${escapeAttribute(
+                        instrumentFromCurrent()
+                    )}',
+                    '${escapeAttribute(
+                        symbol
+                    )}',
+                    '${escapeAttribute(
+                        name
+                    )}'
+                )"
+            >
+
+                🔄 Refresh Live Data
+
+            </button>
+
+        </div>
+
+    `;
+
+}
+
+// ==========================================
+// GET CURRENT INSTRUMENT
+// ==========================================
+
+function instrumentFromCurrent() {
+
+    return selectedInstrument || "";
+
+}
+
+// ==========================================
+// ENTER KEY SEARCH
+// ==========================================
+
+document.addEventListener(
+    "keydown",
+    function(event) {
+
+        if (
+            event.key === "Enter" &&
+            document.activeElement?.id === "search"
+        ) {
+
+            searchStock();
+
+        }
+
+    }
+);
+
+// ==========================================
+// NUMBER
+// ==========================================
+
+function number(value) {
+
+    const n =
+        Number(value);
+
+    return Number.isFinite(n)
+        ? n
+        : 0;
+
 }
 
 // ==========================================
@@ -503,20 +935,17 @@ async function searchStock() {
 
 function formatPrice(value) {
 
-    const number =
-        Number(value);
+    const n =
+        number(value);
 
-    if (!Number.isFinite(number)) {
-        return "0.00";
-    }
-
-    return number.toLocaleString(
+    return n.toLocaleString(
         "en-IN",
         {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
         }
     );
+
 }
 
 // ==========================================
@@ -525,106 +954,59 @@ function formatPrice(value) {
 
 function formatNumber(value) {
 
-    const number =
-        Number(value);
+    const n =
+        number(value);
 
-    if (!Number.isFinite(number)) {
-        return "0";
-    }
-
-    return number.toLocaleString(
-        "en-IN"
+    return n.toLocaleString(
+        "en-IN",
+        {
+            maximumFractionDigits: 0
+        }
     );
+
 }
 
 // ==========================================
-// SAFE HTML
+// HTML ESCAPE
 // ==========================================
 
 function escapeHtml(value) {
 
-    return String(value)
+    return String(value ?? "")
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
-}
-
-// ==========================================
-// ENTER KEY SEARCH
-// ==========================================
-
-if (searchInput) {
-
-    searchInput.addEventListener(
-        "keydown",
-        function(event) {
-
-            if (event.key === "Enter") {
-
-                searchStock();
-
-            }
-
-        }
-    );
 
 }
 
 // ==========================================
-// PAGE LOAD
+// ATTRIBUTE ESCAPE
+// ==========================================
+
+function escapeAttribute(value) {
+
+    return String(value ?? "")
+        .replace(/\\/g, "\\\\")
+        .replace(/'/g, "\\'")
+        .replace(/"/g, "&quot;")
+        .replace(/\n/g, " ");
+
+}
+
+// ==========================================
+// GLOBAL ERROR LOG
 // ==========================================
 
 window.addEventListener(
-    "load",
-    function() {
+    "error",
+    function(event) {
 
-        loadMarketStatus();
+        console.error(
+            "APP ERROR:",
+            event.error || event.message
+        );
 
     }
-);
-
-// ==========================================
-// AUTO REFRESH MARKET STATUS
-// ==========================================
-
-setInterval(
-    loadMarketStatus,
-    30000
-);
-
-// ==========================================
-// AUTO REFRESH CURRENT STOCK
-// ==========================================
-
-let lastSearch =
-    "";
-
-setInterval(
-    function() {
-
-        if (
-            searchInput &&
-            searchInput.value.trim() !== ""
-        ) {
-
-            const current =
-                searchInput.value.trim();
-
-            if (current === lastSearch) {
-
-                searchStock();
-
-            } else {
-
-                lastSearch =
-                    current;
-
-            }
-
-        }
-
-    },
-    60000
 );
