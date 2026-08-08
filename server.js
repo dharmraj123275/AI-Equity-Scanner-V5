@@ -1208,6 +1208,11 @@ app.get(
 
                     );
 
+                console.log(
+    "UPSTOX SEARCH RAW:",
+    JSON.stringify(data, null, 2)
+);
+
                 const instruments =
                     Array.isArray(
                         data?.data
