@@ -1275,81 +1275,155 @@ async function getUpstoxQuote(
 }
 
 
-// ============================================================
-// BUILD AI ANALYSIS
-// ============================================================
+// ==========================================
+// AI EQUITY SCANNER PRO V7
+// SMART TRADING ENGINE
+// ==========================================
 
-function buildAnalysis(
-    quote
-) {
+function round2(value) {
+    return Number(Number(value || 0).toFixed(2));
+}
 
-    const price =
-        Number(
-            quote?.last_price ||
-            0
-        );
+function buildAnalysis(quote) {
 
-    const ohlc =
-        quote?.ohlc ||
-        {};
+    // ==========================================
+    // BASIC MARKET DATA
+    // ==========================================
 
-    const open =
-        Number(
-            ohlc.open ||
-            0
-        );
+    const price = Number(quote?.last_price || 0);
 
-    const high =
-        Number(
-            ohlc.high ||
-            0
-        );
+    const ohlc = quote?.ohlc || {};
 
-    const low =
-        Number(
-            ohlc.low ||
-            0
-        );
+    const open = Number(ohlc.open || 0);
+    const high = Number(ohlc.high || 0);
+    const low = Number(ohlc.low || 0);
+    const close = Number(ohlc.close || 0);
 
-    const close =
-        Number(
-            ohlc.close ||
-            0
-        );
+    const volume = Number(quote?.volume || 0);
+    const oi = Number(quote?.oi || 0);
 
-    const netChange =
-        Number(
-            quote?.net_change ??
-            (
-                price -
-                close
-            )
-        );
+    const netChange = Number(
+        quote?.net_change ??
+        (price - close)
+    );
 
     const changePercent =
         close > 0
-            ? (
-                netChange /
-                close
-            ) * 100
+            ? (netChange / close) * 100
             : 0;
 
-    const volume =
-        Number(
-            quote?.volume ||
+    // ==========================================
+    // VALIDATION
+    // ==========================================
+
+    if (
+        price <= 0 ||
+        high <= 0 ||
+        low <= 0
+    ) {
+        return {
+            success: false,
+            signal: "AVOID",
+            reason: "Insufficient market data"
+        };
+    }
+
+    // ==========================================
+    // MARKET RANGE
+    // ==========================================
+
+    const range = Math.max(
+        high - low,
+        price * 0.001
+    );
+
+    const rangePercent =
+        (range / price) * 100;
+
+    // Position inside today's range
+    const rangePosition =
+        (price - low) / range;
+
+    // ==========================================
+    // TREND
+    // ==========================================
+
+    let trend = "SIDEWAYS";
+
+    if (
+        price > open &&
+        price > low &&
+        rangePosition >= 0.60
+    ) {
+        trend = "BULLISH";
+    }
+
+    if (
+        price < open &&
+        price < high &&
+        rangePosition <= 0.40
+    ) {
+        trend = "BEARISH";
+    }
+
+    // ==========================================
+    // MARKET DEPTH
+    // ==========================================
+
+    const depth =
+        quote?.depth || {};
+
+    const buy =
+        Array.isArray(depth.buy)
+            ? depth.buy
+            : [];
+
+    const sell =
+        Array.isArray(depth.sell)
+            ? depth.sell
+            : [];
+
+    const buyQuantity =
+        buy.reduce(
+            (sum, item) =>
+                sum +
+                Number(item?.quantity || 0),
             0
         );
 
-    const oi =
-        Number(
-            quote?.oi ||
+    const sellQuantity =
+        sell.reduce(
+            (sum, item) =>
+                sum +
+                Number(item?.quantity || 0),
             0
         );
 
+    const totalDepth =
+        buyQuantity +
+        sellQuantity;
 
-    // ========================================================
-    // SUPPORT / RESISTANCE
-    // ========================================================
+    const buyPercent =
+        totalDepth > 0
+            ? (buyQuantity / totalDepth) * 100
+            : 50;
+
+    const sellPercent =
+        totalDepth > 0
+            ? (sellQuantity / totalDepth) * 100
+            : 50;
+
+    let depthTrend = "NEUTRAL";
+
+    if (buyPercent >= 60) {
+        depthTrend = "BUYERS_STRONG";
+    } else if (sellPercent >= 60) {
+        depthTrend = "SELLERS_STRONG";
+    }
+
+    // ==========================================
+    // SMART SUPPORT / RESISTANCE
+    // ==========================================
 
     const support =
         low;
@@ -1357,95 +1431,374 @@ function buildAnalysis(
     const resistance =
         high;
 
+    // ==========================================
+    // BREAKOUT LEVEL
+    // ==========================================
 
-    // ========================================================
-    // TREND
-    // ========================================================
+    const breakoutBuffer =
+        Math.max(
+            range * 0.05,
+            price * 0.001
+        );
 
-    let trend =
-        "SIDEWAYS";
+    const breakoutLevel =
+        resistance + breakoutBuffer;
 
-    if (
-        price > open &&
-        price >= close
-    ) {
+    const breakdownLevel =
+        support - breakoutBuffer;
 
-        trend =
-            "BULLISH";
+    // ==========================================
+    // VOLUME SCORE
+    //
+    // A single quote does not provide average
+    // volume, so we DO NOT pretend this is
+    // relative-volume analysis.
+    // ==========================================
 
-    } else if (
-        price < open &&
-        price <= close
-    ) {
+    let volumeScore = 0;
 
-        trend =
-            "BEARISH";
-
+    if (volume > 0) {
+        volumeScore = 10;
     }
 
+    // ==========================================
+    // PRICE MOMENTUM SCORE
+    // ==========================================
 
-    // ========================================================
-    // AI SCORE
-    // ========================================================
+    let score = 50;
 
-    let score =
-        50;
-
-    if (
-        netChange > 0
-    ) {
-
+    if (netChange > 0) {
         score += 15;
+    }
 
-    } else if (
-        netChange < 0
-    ) {
-
+    if (netChange < 0) {
         score -= 15;
-
     }
 
-    if (
-        price > open
-    ) {
-
+    if (price > open) {
         score += 10;
+    }
 
-    } else if (
-        price < open
-    ) {
-
+    if (price < open) {
         score -= 10;
-
     }
 
-    if (
-        price > close
-    ) {
+    if (rangePosition >= 0.70) {
+        score += 10;
+    }
 
+    if (rangePosition <= 0.30) {
+        score -= 10;
+    }
+
+    if (depthTrend === "BUYERS_STRONG") {
         score += 5;
-
-    } else if (
-        price < close
-    ) {
-
-        score -= 5;
-
     }
 
-    score =
+    if (depthTrend === "SELLERS_STRONG") {
+        score -= 5;
+    }
+
+    score += volumeScore;
+
+    score = Math.max(
+        0,
+        Math.min(
+            100,
+            Math.round(score)
+        )
+    );
+
+    // ==========================================
+    // ATR-LIKE RISK PROXY
+    //
+    // This is NOT true ATR because the quote
+    // endpoint only gives current OHLC.
+    // ==========================================
+
+    const riskDistance =
+        Math.max(
+            range * 0.35,
+            price * 0.003
+        );
+
+    // ==========================================
+    // BUY SETUP
+    // ==========================================
+
+    const buyEntry =
+        price;
+
+    const buyStop =
         Math.max(
             0,
             Math.min(
-                100,
-                score
+                support,
+                buyEntry - riskDistance
             )
         );
 
+    const buyRisk =
+        Math.max(
+            buyEntry - buyStop,
+            price * 0.001
+        );
 
-    // ========================================================
-    // TRADE LEVELS
-    // ========================================================
+    const buyTarget1 =
+        buyEntry +
+        (buyRisk * 1.5);
+
+    const buyTarget2 =
+        buyEntry +
+        (buyRisk * 2.0);
+
+    const buyRR1 =
+        (buyTarget1 - buyEntry) /
+        buyRisk;
+
+    const buyRR2 =
+        (buyTarget2 - buyEntry) /
+        buyRisk;
+
+    // ==========================================
+    // SELL SETUP
+    // ==========================================
+
+    const sellEntry =
+        price;
+
+    const sellStop =
+        sellEntry +
+        riskDistance;
+
+    const sellRisk =
+        Math.max(
+            sellStop - sellEntry,
+            price * 0.001
+        );
+
+    const sellTarget1 =
+        sellEntry -
+        (sellRisk * 1.5);
+
+    const sellTarget2 =
+        sellEntry -
+        (sellRisk * 2.0);
+
+    const sellRR1 =
+        (sellEntry - sellTarget1) /
+        sellRisk;
+
+    const sellRR2 =
+        (sellEntry - sellTarget2) /
+        sellRisk;
+
+    // ==========================================
+    // CONDITIONS
+    // ==========================================
+
+    const bullish =
+        trend === "BULLISH";
+
+    const bearish =
+        trend === "BEARISH";
+
+    const strongBuy =
+        bullish &&
+        score >= 80 &&
+        (
+            depthTrend ===
+            "BUYERS_STRONG" ||
+            totalDepth === 0
+        ) &&
+        buyRR1 >= 1.5;
+
+    const normalBuy =
+        bullish &&
+        score >= 65 &&
+        buyRR1 >= 1.5;
+
+    const strongSell =
+        bearish &&
+        score <= 20 &&
+        (
+            depthTrend ===
+            "SELLERS_STRONG" ||
+            totalDepth === 0
+        ) &&
+        sellRR1 >= 1.5;
+
+    const normalSell =
+        bearish &&
+        score <= 35 &&
+        sellRR1 >= 1.5;
+
+    // ==========================================
+    // BREAKOUT DETECTION
+    // ==========================================
+
+    const nearResistance =
+        price >=
+        resistance - breakoutBuffer;
+
+    const nearSupport =
+        price <=
+        support + breakoutBuffer;
+
+    /*
+     * Because current OHLC does not prove a
+     * confirmed breakout, we label this as
+     * BREAKOUT BUY only when price is at/above
+     * the calculated breakout zone and momentum
+     * is bullish.
+     */
+
+    const breakoutBuy =
+        bullish &&
+        score >= 70 &&
+        nearResistance &&
+        price >= resistance &&
+        buyRR1 >= 1.5;
+
+    // ==========================================
+    // FINAL SIGNAL
+    // ==========================================
+
+    let signal = "WAIT";
+    let reason = "";
+
+    if (breakoutBuy) {
+
+        signal = "BREAKOUT BUY";
+
+        reason =
+            "Price is testing/breaking resistance with bullish momentum.";
+
+    } else if (strongBuy) {
+
+        signal = "STRONG BUY";
+
+        reason =
+            "Strong bullish score with acceptable risk/reward.";
+
+    } else if (normalBuy) {
+
+        signal = "BUY";
+
+        reason =
+            "Bullish trend with minimum 1:1.5 risk/reward.";
+
+    } else if (strongSell) {
+
+        signal = "SELL";
+
+        reason =
+            "Strong bearish momentum with acceptable risk/reward.";
+
+    } else if (normalSell) {
+
+        signal = "SELL";
+
+        reason =
+            "Bearish trend with minimum 1:1.5 risk/reward.";
+
+    } else if (
+        bullish &&
+        buyRR1 < 1.5
+    ) {
+
+        signal = "WAIT";
+
+        reason =
+            "Bullish trend but reward is too small compared with risk.";
+
+    } else if (
+        bearish &&
+        sellRR1 < 1.5
+    ) {
+
+        signal = "WAIT";
+
+        reason =
+            "Bearish trend but reward is too small compared with risk.";
+
+    } else if (
+        score >= 45 &&
+        score <= 55
+    ) {
+
+        signal = "WAIT";
+
+        reason =
+            "Market direction is unclear.";
+
+    } else {
+
+        signal = "AVOID";
+
+        reason =
+            "Setup does not meet minimum trading conditions.";
+
+    }
+
+    // ==========================================
+    // AVOID EXTREME RISK
+    // ==========================================
+
+    if (
+        signal !== "WAIT" &&
+        signal !== "AVOID"
+    ) {
+
+        if (
+            signal.includes("BUY") &&
+            buyRR1 < 1.5
+        ) {
+            signal = "AVOID";
+            reason =
+                "BUY setup rejected because R:R is below 1:1.5.";
+        }
+
+        if (
+            signal === "SELL" &&
+            sellRR1 < 1.5
+        ) {
+            signal = "AVOID";
+            reason =
+                "SELL setup rejected because R:R is below 1:1.5.";
+        }
+
+    }
+
+    // ==========================================
+    // CONFIDENCE
+    // ==========================================
+
+    let confidence =
+        Math.round(
+            Math.min(
+                95,
+                Math.max(
+                    50,
+                    score
+                )
+            )
+        );
+
+    if (
+        signal === "WAIT" ||
+        signal === "AVOID"
+    ) {
+        confidence =
+            Math.min(
+                confidence,
+                70
+            );
+    }
+
+    // ==========================================
+    // SELECT TRADE LEVELS
+    // ==========================================
 
     let entry =
         price;
@@ -1459,220 +1812,190 @@ function buildAnalysis(
     let stopLoss =
         price;
 
-    let signal =
-        "HOLD";
-
-
-    if (
-        trend ===
-        "BULLISH"
-    ) {
-
-        signal =
-            "BUY";
-
-        entry =
-            price;
-
-        target1 =
-            price +
-            (
-                (
-                    resistance -
-                    price
-                ) * 0.50
-            );
-
-        target2 =
-            resistance;
-
-        stopLoss =
-            support;
-
-    } else if (
-        trend ===
-        "BEARISH"
-    ) {
-
-        signal =
-            "SELL";
-
-        entry =
-            price;
-
-        target1 =
-            price -
-            (
-                (
-                    price -
-                    support
-                ) * 0.50
-            );
-
-        target2 =
-            support;
-
-        stopLoss =
-            resistance;
-
-    }
-
-
-    // ========================================================
-    // RISK REWARD
-    // ========================================================
-
     let riskReward =
         0;
 
     if (
-        signal ===
-        "BUY"
+        signal === "BUY" ||
+        signal === "STRONG BUY" ||
+        signal === "BREAKOUT BUY"
     ) {
 
-        const risk =
-            entry -
-            stopLoss;
+        entry =
+            buyEntry;
 
-        const reward =
-            target1 -
-            entry;
+        target1 =
+            buyTarget1;
 
-        if (
-            risk > 0
-        ) {
+        target2 =
+            buyTarget2;
 
-            riskReward =
-                reward /
-                risk;
+        stopLoss =
+            buyStop;
 
-        }
+        riskReward =
+            buyRR1;
+
+    } else if (
+        signal === "SELL"
+    ) {
+
+        entry =
+            sellEntry;
+
+        target1 =
+            sellTarget1;
+
+        target2 =
+            sellTarget2;
+
+        stopLoss =
+            sellStop;
+
+        riskReward =
+            sellRR1;
 
     }
+
+    // ==========================================
+    // TRADE QUALITY
+    // ==========================================
+
+    let tradeQuality =
+        "LOW";
 
     if (
-        signal ===
-        "SELL"
+        riskReward >= 2
     ) {
-
-        const risk =
-            stopLoss -
-            entry;
-
-        const reward =
-            entry -
-            target1;
-
-        if (
-            risk > 0
-        ) {
-
-            riskReward =
-                reward /
-                risk;
-
-        }
-
+        tradeQuality =
+            "EXCELLENT";
+    } else if (
+        riskReward >= 1.5
+    ) {
+        tradeQuality =
+            "GOOD";
+    } else if (
+        riskReward >= 1
+    ) {
+        tradeQuality =
+            "WEAK";
     }
 
-
-    // ========================================================
-    // MARKET DEPTH
-    // ========================================================
-
-    const depth =
-        quote?.depth ||
-        {};
-
-    const buy =
-        Array.isArray(
-            depth.buy
-        )
-            ? depth.buy
-            : [];
-
-    const sell =
-        Array.isArray(
-            depth.sell
-        )
-            ? depth.sell
-            : [];
-
-    const buyQuantity =
-        buy.reduce(
-            (
-                sum,
-                item
-            ) =>
-                sum +
-                Number(
-                    item?.quantity ||
-                    0
-                ),
-            0
-        );
-
-    const sellQuantity =
-        sell.reduce(
-            (
-                sum,
-                item
-            ) =>
-                sum +
-                Number(
-                    item?.quantity ||
-                    0
-                ),
-            0
-        );
-
+    // ==========================================
+    // RETURN
+    // ==========================================
 
     return {
 
-        price,
+        price:
+            round2(price),
 
-        netChange,
+        netChange:
+            round2(netChange),
 
-        changePercent,
+        changePercent:
+            round2(changePercent),
 
-        open,
+        open:
+            round2(open),
 
-        high,
+        high:
+            round2(high),
 
-        low,
+        low:
+            round2(low),
 
-        close,
+        close:
+            round2(close),
 
         volume,
 
         oi,
 
-        support,
+        support:
+            round2(support),
 
-        resistance,
+        resistance:
+            round2(resistance),
+
+        breakoutLevel:
+            round2(breakoutLevel),
+
+        breakdownLevel:
+            round2(breakdownLevel),
 
         trend,
 
         aiScore:
             score,
 
+        confidence,
+
         signal,
 
-        entry,
+        reason,
 
-        target1,
+        tradeQuality,
 
-        target2,
+        entry:
+            round2(entry),
 
-        stopLoss,
+        target1:
+            round2(target1),
 
-        riskReward,
+        target2:
+            round2(target2),
+
+        stopLoss:
+            round2(stopLoss),
+
+        riskReward:
+            round2(riskReward),
+
+        riskRewardTarget1:
+            round2(
+                signal === "SELL"
+                    ? sellRR1
+                    : buyRR1
+            ),
+
+        riskRewardTarget2:
+            round2(
+                signal === "SELL"
+                    ? sellRR2
+                    : buyRR2
+            ),
 
         marketDepth: {
 
-            buyQuantity,
+            buyQuantity:
+                buyQuantity,
 
-            sellQuantity
+            sellQuantity:
+                sellQuantity,
+
+            buyPercent:
+                round2(buyPercent),
+
+            sellPercent:
+                round2(sellPercent),
+
+            trend:
+                depthTrend
+
+        },
+
+        strategy: {
+
+            minimumRR:
+                1.5,
+
+            preferredRR:
+                2.0,
+
+            nearResistance,
+
+            nearSupport
 
         },
 
@@ -1680,9 +2003,7 @@ function buildAnalysis(
             quote
 
     };
-
 }
-
 
 // ============================================================
 // API LIVE
