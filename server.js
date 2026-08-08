@@ -1296,24 +1296,49 @@ async function getHistoricalCandles(
         throw error;
     }
 
-    // Today's date in India
+    const token =
+        process.env.UPSTOX_ACCESS_TOKEN;
+
+    if (!token) {
+
+        const error =
+            new Error(
+                "UPSTOX_ACCESS_TOKEN is missing."
+            );
+
+        error.statusCode = 401;
+
+        throw error;
+    }
+
+    // ------------------------------------------
+    // INDIA DATE
+    // ------------------------------------------
+
     const now = new Date();
 
-    const indiaDate =
-        new Date(
-            now.toLocaleString(
-                "en-US",
-                {
-                    timeZone: "Asia/Kolkata"
-                }
-            )
+    const indiaString =
+        now.toLocaleString(
+            "en-US",
+            {
+                timeZone: "Asia/Kolkata"
+            }
         );
 
+    const indiaDate =
+        new Date(indiaString);
+
     // YYYY-MM-DD
-    const toDate =
-        indiaDate
+    function formatDate(date) {
+
+        return date
             .toISOString()
             .split("T")[0];
+
+    }
+
+    const toDate =
+        formatDate(indiaDate);
 
     // 30 days back
     const from =
@@ -1324,40 +1349,94 @@ async function getHistoricalCandles(
     );
 
     const fromDate =
-        from
-            .toISOString()
-            .split("T")[0];
+        formatDate(from);
 
-    const response =
-        await upstoxRequest({
+    // ------------------------------------------
+    // UPSTOX V3 URL
+    // ------------------------------------------
 
-            method: "GET",
+    const url =
+        `https://api.upstox.com/v3/historical-candle/` +
+        `${encodeURIComponent(instrument)}/` +
+        `minutes/${interval}/` +
+        `${toDate}/` +
+        `${fromDate}`;
 
-            url:
-                `/v3/historical-candle/${encodeURIComponent(instrument)}/minutes/${interval}/${toDate}/${fromDate}`
+    console.log(
+        "Historical V3 URL:",
+        url
+    );
 
-        });
+    try {
 
-    const candles =
-        response.data?.data?.candles ||
-        [];
+        const response =
+            await axios.get(
+                url,
+                {
+                    headers: {
 
-    if (
-        !Array.isArray(candles) ||
-        candles.length === 0
-    ) {
+                        "Accept":
+                            "application/json",
 
-        const error =
-            new Error(
-                "Upstox returned no historical candle data."
+                        "Authorization":
+                            `Bearer ${token}`
+
+                    },
+
+                    timeout: 15000
+                }
             );
 
-        error.statusCode = 404;
+        const candles =
+            response.data?.data?.candles ||
+            [];
 
-        throw error;
+        if (
+            !Array.isArray(candles) ||
+            candles.length === 0
+        ) {
+
+            const error =
+                new Error(
+                    "Upstox returned no historical candle data."
+                );
+
+            error.statusCode = 404;
+
+            throw error;
+        }
+
+        console.log(
+            `Historical candles received: ${candles.length}`
+        );
+
+        return candles;
+
+    } catch (error) {
+
+        console.error(
+            "HISTORICAL V3 ERROR:",
+            error.response?.data ||
+            error.message
+        );
+
+        const status =
+            error.response?.status ||
+            error.statusCode ||
+            500;
+
+        const newError =
+            new Error(
+                error.response?.data?.errors?.[0]?.message ||
+                error.message ||
+                "Historical candle request failed."
+            );
+
+        newError.statusCode =
+            status;
+
+        throw newError;
     }
-
-    return candles;
 }
 
 // ==========================================
