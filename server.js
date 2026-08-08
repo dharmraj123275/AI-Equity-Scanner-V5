@@ -1515,6 +1515,23 @@ function round2(value) {
     return Number(Number(value || 0).toFixed(2));
 }
 
+// ==========================================
+// HELPER: ROUND TO 2 DECIMALS
+// ==========================================
+
+function round2(value) {
+    const n = Number(value);
+
+    if (!Number.isFinite(n)) {
+        return 0;
+    }
+
+    return Number(n.toFixed(2));
+}
+// ==========================================
+// BUILD ANALYSIS
+// ==========================================
+
 function buildAnalysis(quote) {
 
     // ==========================================
