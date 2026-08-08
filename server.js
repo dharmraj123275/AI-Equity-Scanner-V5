@@ -1938,10 +1938,10 @@ function buildAnalysis(quote) {
 
     } else if (strongSell) {
 
-        signal = "SELL";
+    signal = "STRONG SELL";
 
-        reason =
-            "Strong bearish momentum with acceptable risk/reward.";
+    reason =
+        "Strong bearish momentum with strong seller confirmation and acceptable risk/reward.";
 
     } else if (normalSell) {
 
@@ -2081,7 +2081,8 @@ if (
 // ------------------------------------------
 
 else if (
-    signal === "SELL"
+    signal === "SELL" ||
+    signal === "STRONG SELL"
 ) {
 
     entry = sellEntry;
@@ -2320,11 +2321,12 @@ riskReward =
             round2(riskReward),
 
         riskRewardTarget1:
-            round2(
-                signal === "SELL"
-                    ? sellRR1
-                    : buyRR1
-            ),
+    round2(
+        signal === "SELL" ||
+        signal === "STRONG SELL"
+            ? sellRR1
+            : buyRR1
+    ),
 
         riskRewardTarget2:
             round2(
